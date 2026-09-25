@@ -16,6 +16,8 @@
     padType: 'xbox',
     padIndex: -1,
     padPrev: [],
+    padRest: {},
+    lastTouchT: 0,
     touch: { active: false, joyId: -1, joyX: 0, joyY: 0, ox: 0, oy: 0, camId: -1, camX: 0, camY: 0, camDX: 0, camDY: 0, held: {} },
     capture: null,       // rebind capture callback
     onNav: null,         // menu navigation callback(dir)
@@ -154,7 +156,14 @@
     for (i = 0; i < pressedNow.length; i++) if (pressedNow[i] && !C.padPrev[i]) active = true;
     var ls = deadzone(gp.axes[0] || 0, gp.axes[1] || 0, S.deadzone);
     var rs = deadzone(gp.axes[2] || 0, gp.axes[3] || 0, S.deadzone);
-    if (Math.abs(ls[0]) + Math.abs(ls[1]) + Math.abs(rs[0]) + Math.abs(rs[1]) > 0.3) active = true;
+    // Only real stick MOVEMENT counts as "using the pad". Some phones expose
+    // phantom gamepads (fingerprint readers etc.) whose axes sit at a fixed
+    // non-zero value; comparing against the resting value ignores those.
+    var rest = C.padRest[gp.index];
+    if (!rest) rest = C.padRest[gp.index] = [gp.axes[0] || 0, gp.axes[1] || 0, gp.axes[2] || 0, gp.axes[3] || 0];
+    var moved = 0;
+    for (i = 0; i < 4; i++) moved += Math.abs((gp.axes[i] || 0) - rest[i]);
+    if (moved > 0.5 && Math.abs(ls[0]) + Math.abs(ls[1]) + Math.abs(rs[0]) + Math.abs(rs[1]) > 0.3) active = true;
     if (active && C.device !== 'pad') C.setDevice('pad');
 
     // rebinding capture
@@ -242,11 +251,25 @@
     }
     var T = C.touch;
     T.btnTouches = {};
+    // Drop any finger we still think is down but the browser says is gone
+    // (a touchend can be lost when the screen changes mid-touch).
+    function pruneStale(e) {
+      var live = {}, i3, id;
+      for (i3 = 0; i3 < e.touches.length; i3++) live[e.touches[i3].identifier] = true;
+      if (T.joyId !== -1 && !live[T.joyId]) { T.joyId = -1; T.joyX = 0; T.joyY = 0; joyBase.classList.remove('on'); joyBase.classList.remove('sprint'); }
+      if (T.camId !== -1 && !live[T.camId]) T.camId = -1;
+      for (id in T.btnTouches) if (!live[id]) {
+        var a = T.btnTouches[id]; T.held[a] = false; delete T.btnTouches[id];
+        if (C.touchBtnEls[a]) C.touchBtnEls[a].classList.remove('down');
+      }
+    }
     ui.addEventListener('touchstart', function (e) {
       if (C.editing) return;
       e.preventDefault();
+      C.lastTouchT = Date.now();
       C.setDevice('touch');
-      if (BBA.Audio) BBA.Audio.unlock();
+      try { if (BBA.Audio) BBA.Audio.unlock(); } catch (err) {}
+      pruneStale(e);
       var i2;
       for (i2 = 0; i2 < e.changedTouches.length; i2++) {
         var t = e.changedTouches[i2];
@@ -256,11 +279,11 @@
           T.btnTouches[t.identifier] = act; T.held[act] = true; btn.classList.add('down');
           continue;
         }
-        if (t.clientX < root.innerWidth * 0.45 && T.joyId < 0) {
+        if (t.clientX < root.innerWidth * 0.45 && T.joyId === -1) {
           T.joyId = t.identifier; T.ox = t.clientX; T.oy = t.clientY; T.joyX = 0; T.joyY = 0;
           joyBase.style.left = (t.clientX) + 'px'; joyBase.style.top = (t.clientY) + 'px';
           joyBase.classList.add('on'); joyKnob.style.transform = 'translate(-50%,-50%)';
-        } else if (T.camId < 0) {
+        } else if (T.camId === -1) {
           T.camId = t.identifier; T.camX = t.clientX; T.camY = t.clientY;
         }
       }
@@ -268,6 +291,8 @@
     ui.addEventListener('touchmove', function (e) {
       if (C.editing) return;
       e.preventDefault();
+      C.lastTouchT = Date.now();
+      if (C.device !== 'touch') C.setDevice('touch');
       var i2, S = BBA.Settings.data;
       for (i2 = 0; i2 < e.changedTouches.length; i2++) {
         var t = e.changedTouches[i2];
@@ -373,20 +398,20 @@
     var ms = 0.0024 * S.mouseSens;
     st.lookX = C.mouseDX * ms; st.lookY = C.mouseDY * ms * (S.invertY ? -1 : 1);
     C.mouseDX = 0; C.mouseDY = 0;
-    // touch
+    // gamepad
+    C.pollPad(st, dt);
+    // touch (applied whenever a finger is on the controls, whatever mode we're in)
     var T = C.touch;
-    if (C.device === 'touch') {
-      if (T.joyId >= 0) {
+    if (C.device === 'touch' || T.joyId !== -1 || T.camId !== -1) {
+      if (T.joyId !== -1) {
         st.mx = T.joyX; st.my = -T.joyY;
         var jm = Math.sqrt(T.joyX * T.joyX + T.joyY * T.joyY);
         if (jm >= 0.8) h.sprint = true;      // sprint by pushing the stick ~80%+
       }
-      for (i = 0; i < ACTIONS.length; i++) if (T.held[ACTIONS[i]]) h[ACTIONS[i]] = true;
       st.lookX += T.camDX * 0.0065 * S.mouseSens; st.lookY += T.camDY * 0.005 * S.mouseSens * (S.invertY ? -1 : 1);
-      T.camDX = 0; T.camDY = 0;
     }
-    // gamepad
-    C.pollPad(st, dt);
+    T.camDX = 0; T.camDY = 0;
+    for (i = 0; i < ACTIONS.length; i++) if (T.held[ACTIONS[i]]) h[ACTIONS[i]] = true;
     st.device = C.device;
     st.ballcamPress = h.ballcam && !C.edgePrev.ballcam;
     C.edgePrev.ballcam = h.ballcam;
@@ -394,6 +419,17 @@
     C.readyQueued = false;
     C.edgePrev.ready = h.ready;
     C.state = st;
+    if (C.debugEl === undefined) {
+      C.debugEl = null;
+      if (/touchdebug/.test(root.location.search)) {
+        C.debugEl = doc.createElement('div');
+        C.debugEl.style.cssText = 'position:fixed;left:4px;bottom:4px;z-index:99;font:11px monospace;color:#0f0;background:rgba(0,0,0,.6);padding:3px 5px;pointer-events:none;white-space:pre';
+        doc.body.appendChild(C.debugEl);
+      }
+    }
+    if (C.debugEl) C.debugEl.textContent = 'dev=' + C.device + ' joy=' + T.joyId + ' ' + T.joyX.toFixed(2) + ',' + T.joyY.toFixed(2) +
+      ' mv=' + st.mx.toFixed(2) + ',' + st.my.toFixed(2) + ' pads=' + (root.navigator.getGamepads ? [].filter.call(root.navigator.getGamepads(), Boolean).length : 0) +
+      ' ui=' + (C.touchUI ? root.getComputedStyle(C.touchUI).display : '-') + ' w=' + root.innerWidth;
     return st;
   };
 

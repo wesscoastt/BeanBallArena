@@ -8,7 +8,7 @@
   else { root.BBA = root.BBA || {}; root.BBA.C = mod; }
 })(this, function () {
   return {
-    VERSION: '0.4.0',
+    VERSION: '0.4.1',
     TICK: 1 / 60,
 
     TEAM_BLUE: 0,
