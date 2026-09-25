@@ -9,16 +9,16 @@ var Match = require('./match.js');
 var LOBBY_GRACE = 20;                      // seconds a disconnected lobby member keeps their seat
 var MATCH_GRACE = Protocol.RECONNECT_SECONDS;
 
-var DEFAULT_SETTINGS = Rules.merge(Rules.DEFAULTS, { autoFillBots: true });
+var DEFAULT_SETTINGS = Rules.merge(Rules.DEFAULTS, { autoFillBots: true, warmup: 60 });
 
 var LIMITS = {
   teamSize: [1, 3, 'int'], duration: [60, 600, 'int'], scoreLimit: [0, 99, 'int'], tackleStrength: [0.3, 2, 'num'],
-  ballWeight: [0.5, 2, 'num'], gravity: [0.4, 1.6, 'num'], jumpHeight: [0.6, 1.8, 'num'], respawnTime: [0.5, 8, 'num'], obstacles: [0, 2.5, 'num']
+  ballWeight: [0.5, 2, 'num'], gravity: [0.4, 1.6, 'num'], jumpHeight: [0.6, 1.8, 'num'], respawnTime: [0.5, 8, 'num'], obstacles: [0, 2.5, 'num'], warmup: [-1, 180, 'int']
 };
 var CHOICES = {
   difficulty: ['easy', 'normal', 'hard'],
   modifier: ['none', 'superbounce', 'lowgravity', 'heavyball', 'megaball', 'turbo'],
-  overtime: [true, false], autoFillBots: [true, false], arena: ['bean_bowl']
+  overtime: [true, false], autoFillBots: [true, false], arena: require('../shared/arenaDef.js').ids
 };
 
 function cleanName(n) {
@@ -31,6 +31,8 @@ function cleanCosmetics(c) {
   ['pattern', 'face', 'hat', 'upper', 'lower', 'celebration', 'victory'].forEach(function (k2) { if (ok.test(String(c[k2] || ''))) out[k2] = String(c[k2]); });
   ['color', 'color2'].forEach(function (k2) { if (/^#[0-9a-f]{6}$/i.test(String(c[k2] || ''))) out[k2] = String(c[k2]); });
   var num = parseInt(c.number, 10); out.number = isNaN(num) ? 7 : Math.max(0, Math.min(99, num));
+  out.jerseyColor = /^#[0-9a-f]{6}$/i.test(String(c.jerseyColor || '')) ? String(c.jerseyColor) : 'team';
+  out.jerseyName = String(c.jerseyName || '').toUpperCase().replace(/[^A-Z0-9 .'\-]/g, '').trim().slice(0, 10);
   return out;
 }
 

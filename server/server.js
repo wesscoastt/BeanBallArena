@@ -157,6 +157,12 @@ io.on('connection', function (socket) {
     var pid = room.match.pidOf(socket.data.token);
     if (pid >= 0) room.match.onInput(pid, packets);
   }));
+  socket.on('warmupReady', function (d) {
+    var room = myRoom();
+    if (!room || !room.match) return;
+    var pid = room.match.pidOf(socket.data.token);
+    if (pid >= 0) room.match.sim.setWarmupReady(pid, !!(d && d.ready));
+  });
   socket.on('pingCheck', function (t, cb) { ack(cb, t); });
 
   socket.on('disconnect', function () {

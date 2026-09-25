@@ -17,21 +17,19 @@
   var isNode = (typeof module === 'object' && module.exports);
   var deps = isNode
     ? [require('./constants.js'), require('./gameRules.js'), require('./arenaDef.js')]
-    : [root.BBA.C, root.BBA.Rules, root.BBA.Arena];
+    : [root.BBA.C, root.BBA.Rules, root.BBA.Arenas];
   var mod = factory(deps[0], deps[1], deps[2]);
   if (isNode) { module.exports = mod; } else { root.BBA.AI = mod; }
-})(this, function (C, Rules, Arena) {
+})(this, function (C, Rules, Arenas) {
   var P = C.PLAYER;
 
   function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
   function hyp(x, z) { return Math.sqrt(x * x + z * z); }
   function wrap(a) { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; }
 
-  /* ---------------- navigation (static graph + walkability) ---------------- */
-  var NAV = { nodes: Arena.navNodes, matrix: null };
-
-  function segWalkable(ax, az, ay, bx, bz) {
-    var g = Arena.groundHeight;
+  /* ---------------- navigation (static graph + walkability, per arena) ---------------- */
+  function segWalkable(A, ax, az, ay, bx, bz) {
+    var g = A.groundHeight;
     var dx = bx - ax, dz = bz - az, L = hyp(dx, dz);
     if (L < 0.01) return true;
     var n = Math.ceil(L / 0.45), i;
@@ -39,37 +37,41 @@
     var h = Math.max(ay, g(ax, az));
     for (i = 1; i <= n; i++) {
       var t = i / n, x = ax + dx * t, z = az + dz * t;
-      var nh = Math.max(g(x, z), g(x + px, z + pz), g(x - px, z - pz));
+      var c = g(x, z);
+      if (c < -1 || g(x + px, z + pz) < -1 || g(x - px, z - pz) < -1) return false; // pit / water / void
+      var nh = Math.max(c, g(x + px, z + pz), g(x - px, z - pz));
       if (nh > h + 0.42) return false;
       h = nh;
     }
     return true;
   }
 
-  function buildMatrix() {
-    var n = NAV.nodes.length, m = [], i, j;
+  function navOf(A) {
+    if (A._nav) return A._nav;
+    var nodes = A.navNodes, n = nodes.length, m = [], i, j;
     for (i = 0; i < n; i++) {
       m.push([]);
       for (j = 0; j < n; j++) {
         if (i === j) { m[i].push(0); continue; }
-        var a = NAV.nodes[i], b = NAV.nodes[j];
-        m[i].push(segWalkable(a.x, a.z, Arena.groundHeight(a.x, a.z), b.x, b.z) ? hyp(b.x - a.x, b.z - a.z) : -1);
+        var a = nodes[i], b = nodes[j];
+        m[i].push(segWalkable(A, a.x, a.z, A.groundHeight(a.x, a.z), b.x, b.z) ? hyp(b.x - a.x, b.z - a.z) : -1);
       }
     }
-    NAV.matrix = m;
+    A._nav = { nodes: nodes, matrix: m };
+    return A._nav;
   }
 
-  function route(sx, sz, sy, tx, tz) {
-    if (segWalkable(sx, sz, sy, tx, tz)) return [{ x: tx, z: tz }];
-    if (!NAV.matrix) buildMatrix();
+  function route(A, sx, sz, sy, tx, tz) {
+    if (segWalkable(A, sx, sz, sy, tx, tz)) return [{ x: tx, z: tz }];
+    var NAV = navOf(A);
     var nodes = NAV.nodes, n = nodes.length, i, j;
     var dist = [], prev = [], done = [];
     var toGoal = [];
     for (i = 0; i < n; i++) {
       var nd = nodes[i];
-      dist.push(segWalkable(sx, sz, sy, nd.x, nd.z) ? hyp(nd.x - sx, nd.z - sz) : 1e9);
+      dist.push(segWalkable(A, sx, sz, sy, nd.x, nd.z) ? hyp(nd.x - sx, nd.z - sz) : 1e9);
       prev.push(-1); done.push(false);
-      toGoal.push(segWalkable(nd.x, nd.z, Arena.groundHeight(nd.x, nd.z), tx, tz) ? hyp(tx - nd.x, tz - nd.z) : -1);
+      toGoal.push(segWalkable(A, nd.x, nd.z, A.groundHeight(nd.x, nd.z), tx, tz) ? hyp(tx - nd.x, tz - nd.z) : -1);
     }
     var bestEnd = -1, bestTotal = 1e9;
     for (var it = 0; it < n; it++) {
@@ -83,7 +85,7 @@
         if (w > 0 && !done[j] && ud + w < dist[j]) { dist[j] = ud + w; prev[j] = u; }
       }
     }
-    if (bestEnd < 0) return [{ x: tx, z: tz }]; // give up, go straight (unstick logic handles it)
+    if (bestEnd < 0) return [{ x: tx, z: tz }];
     var path = [{ x: tx, z: tz }], c = bestEnd;
     while (c >= 0) { path.unshift({ x: nodes[c].x, z: nodes[c].z }); c = prev[c]; }
     return path;
@@ -92,6 +94,7 @@
   /* ---------------- AI manager ---------------- */
   function AI(sim) {
     this.sim = sim;
+    this.A = sim.arena;
     this.brains = {};
     this.teamTimer = 0;
     this.pred = null;
@@ -148,7 +151,7 @@
   /* ---------------- helpers ---------------- */
   AI.prototype._ballPos = function () {
     var b = this.sim.ball;
-    if (b.state === 'gone' || b.state === 'spawn' || b.state === 'dunked') return { x: Arena.ballSpawn.x, y: 1, z: Arena.ballSpawn.z };
+    if (b.state === 'gone' || b.state === 'spawn' || b.state === 'dunked') return { x: this.A.ballSpawn.x, y: 1, z: this.A.ballSpawn.z };
     return { x: b.x, y: b.y, z: b.z };
   };
 
@@ -197,6 +200,10 @@
   /* ---------------- role assignment ---------------- */
   AI.prototype._assignRoles = function () {
     var sim = this.sim, b = sim.ball, team, i;
+    if (sim.match.phase === 'warmup') {
+      for (var pid in this.brains) if (this.brains.hasOwnProperty(pid) && !this.brains[pid].dummy) this.brains[pid].role = 'warmup';
+      return;
+    }
     var holder = b.holder >= 0 ? sim.players[b.holder] : null;
     for (team = 0; team < 2; team++) {
       var mates = this._mates(team);
@@ -313,6 +320,7 @@
         case 'mark': this._mark(br, p); break;
         case 'recover': this._recover(br, p); break;
         case 'receive': this._recover(br, p); break;
+        case 'warmup': this._warmup(br, p); break;
         default: this._support(br, p);
       }
     }
@@ -353,11 +361,11 @@
     if (hasBall && !p.grounded && sim.dunkEligible(p)) this._pulse(br, 'shoot');
     // hop over a spinning bar
     if (p.grounded && p.state === 'normal') {
-      var arms = Arena.arms, mul = sim.settings.obstacles;
+      var arms = this.A.arms, mul = sim.settings.obstacles;
       for (i = 0; i < arms.length; i++) {
         var a = arms[i];
         var fx = p.x + p.vx * 0.3, fz = p.z + p.vz * 0.3;
-        var ang = Arena.armAngle(a, sim.time + 0.25, mul);
+        var ang = this.A.armAngle(a, sim.time + 0.25, mul);
         var ax = Math.cos(ang), az = Math.sin(ang);
         var t = clamp((fx - a.x) * ax + (fz - a.z) * az, -a.len, a.len);
         var d = hyp(fx - (a.x + ax * t), fz - (a.z + az * t));
@@ -405,12 +413,13 @@
       inp.look = br.look;
       return;
     }
-    var lim = Arena.halfW - 0.8, limz = Arena.halfL - 0.8;
+    var lim = this.A.halfW - 0.8, limz = this.A.halfL - 0.8;
     var tx = clamp(br.tx, -lim, lim), tz = clamp(br.tz, -limz, limz);
+    if (this.A.groundHeight(tx, tz) < -1) { var ss = this.A.safeSpot(tx, tz); tx = ss.x; tz = ss.z; } // never aim into water / void
     // path planning (cached)
     br.pathT -= dt;
     if (!br.path || br.pathT <= 0 || hyp(tx - br.pathTx, tz - br.pathTz) > 2) {
-      br.path = route(p.x, p.z, p.y, tx, tz);
+      br.path = route(this.A, p.x, p.z, p.y, tx, tz);
       br.pathT = 0.6; br.pathTx = tx; br.pathTz = tz;
     }
     var wp = br.path[0];
@@ -424,7 +433,7 @@
     }
     if (d > 0.001) { dx /= d; dz /= d; } else { dx = 0; dz = 0; }
     // avoid posts
-    var posts = Arena.posts, i;
+    var posts = this.A.posts, i;
     for (i = 0; i < posts.length; i++) {
       var po = posts[i];
       var ox = po.x - p.x, oz = po.z - p.z, od = hyp(ox, oz);
@@ -499,7 +508,7 @@
     // pick a pad route when a dunker is near a bounce pad lined up with the hoop
     var tx = h.x, tz = h.z - h.side * 1.2;
     if (br.pers.dunk > 1.2 || rng() < 0.25) {
-      var pads = Arena.pads;
+      var pads = this.A.pads;
       for (i = 0; i < pads.length; i++) {
         var pd = pads[i];
         if (pd.type !== 'bounce' || (pd.z * h.side) < 0) continue;
@@ -714,6 +723,37 @@
       }
     }
     return false;
+  };
+
+  /* Warm-up: goof around, take practice shots, leave the ball to humans. */
+  AI.prototype._warmup = function (br, p) {
+    var sim = this.sim, b = sim.ball, rng = sim.rng;
+    var h = sim.attackHoop(p.team);
+    if (b.holder === p.id) {
+      var d = hyp(h.x - p.x, h.z - p.z);
+      if (d < 14 && d > 6 && p.grounded && !br.holdShoot) { this._startShot(br, p); return; }
+      this._setTarget(br, h.x, h.z - h.side * 9, false, 1);
+      br.look = Math.atan2(h.x - p.x, h.z - p.z);
+      return;
+    }
+    // chase the ball only if no human is closer to it
+    if (b.state === 'free') {
+      var myD = hyp(b.x - p.x, b.z - p.z), humanCloser = false, i;
+      for (i = 0; i < sim.players.length; i++) {
+        var q = sim.players[i];
+        if (!q.isBot && hyp(b.x - q.x, b.z - q.z) < myD + 4) humanCloser = true;
+      }
+      if (!humanCloser && myD < 12) { this._recover(br, p); return; }
+    }
+    br.spotT -= 0.25;
+    if (!br.spot || br.spotT <= 0 || br.spot.kind !== 'warm') {
+      var side = p.team === 0 ? -1 : 1;
+      br.spot = { kind: 'warm', x: (rng() - 0.5) * 24, z: side * (4 + rng() * 14) };
+      br.spotT = 2.5 + rng() * 3;
+    }
+    br.face = null; br.look = Math.atan2(br.spot.x - p.x, br.spot.z - p.z);
+    this._setTarget(br, br.spot.x, br.spot.z, false, 1.5);
+    if (p.grounded && rng() < 0.06) this._pulse(br, 'jump');
   };
 
   AI.prototype._recover = function (br, p) {

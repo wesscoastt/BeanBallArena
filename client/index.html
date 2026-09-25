@@ -32,11 +32,13 @@
   <div id="charge"><svg viewBox="0 0 100 100"><circle class="c-bg" cx="50" cy="50" r="42"/><circle class="c-fg" id="charge-fg" cx="50" cy="50" r="42"/></svg><span id="charge-txt">SHOOT</span></div>
   <div id="prompt"></div>
   <div id="hints"></div>
+  <div id="warmup-box" class="hidden"><div class="wu-title" id="wu-title">WARM-UP</div><div class="wu-sub" id="wu-sub"></div><button id="wu-ready" class="pbtn go small">I'M READY</button></div>
   <div id="tutorial-box" class="hidden"><div class="tut-step" id="tut-step"></div><div class="tut-text" id="tut-text"></div><div class="tut-sub" id="tut-sub"></div><button class="tut-skip" id="tut-skip">Skip tutorial</button></div>
   <button id="pause-btn" class="hidden" aria-label="Pause">II</button>
   <div id="netinfo"></div>
 </div>
 <div id="captions"></div>
+<div id="flash"></div>
 <div id="touch-ui"></div>
 
 <!-- ============ MENUS ============ -->
@@ -67,7 +69,7 @@
       <div class="arenas-title">FEATURED ARENAS</div>
       <div class="arena-row" id="arena-row"></div>
     </div>
-    <button class="tut-btn" data-act="tutorial">&#127891; TUTORIAL</button>
+    <div class="corner-btns"><button class="tut-btn" data-act="tutorial">&#127891; TUTORIAL</button><button class="tut-btn" data-act="practice">&#127936; PRACTICE</button></div>
     <div class="version" id="version"></div>
   </section>
 
@@ -140,6 +142,7 @@
     <div class="cust-panel">
       <h2>CUSTOMIZE</h2>
       <label class="name-row">NAME <input id="cust-name" maxlength="14" autocomplete="off" spellcheck="false"></label>
+      <label class="name-row">JERSEY <input id="cust-jersey" maxlength="10" autocomplete="off" spellcheck="false" placeholder="Name on your back"></label>
       <div class="opt-list" id="cust-opts"></div>
       <div class="panel-actions">
         <button class="pbtn" data-act="randomize">RANDOMIZE</button>

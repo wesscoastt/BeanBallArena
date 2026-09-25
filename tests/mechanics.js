@@ -2,7 +2,7 @@
  * node tests/mechanics.js
  */
 var Sim = require('../shared/sim.js');
-var Arena = require('../shared/arenaDef.js');
+var Arena = require('../shared/arenaDef.js').get('bean_bowl');
 var pass = 0, fail = 0;
 function ok(cond, name, extra) { if (cond) { pass++; console.log('  ok  ' + name + (extra ? '  (' + extra + ')' : '')); } else { fail++; console.log('  FAIL ' + name + (extra ? '  (' + extra + ')' : '')); } }
 function inp(o) { var i = Sim.emptyInput(); for (var k in o) i[k] = o[k]; return i; }

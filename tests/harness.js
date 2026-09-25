@@ -4,11 +4,12 @@
  */
 var Sim = require('../shared/sim.js');
 var AI = require('../shared/ai.js');
-var Arena = require('../shared/arenaDef.js');
+var Arena = require('../shared/arenaDef.js').get(process.argv[5] || 'bean_bowl');
 
 var N = +(process.argv[2] || 6);
 var DIFF = process.argv[3] || 'normal';
 var SIZE = +(process.argv[4] || 3);
+var ARENA = process.argv[5] || 'bean_bowl';
 
 function hyp(x, z) { return Math.sqrt(x * x + z * z); }
 
@@ -18,7 +19,7 @@ var problems = [];
 for (var mi = 0; mi < N; mi++) {
   var roster = [];
   for (var t = 0; t < 2; t++) for (var i = 0; i < SIZE; i++) roster.push({ team: t, name: 'B' + t + i, isBot: true });
-  var s = new Sim({ roster: roster, seed: 1000 + mi * 77, settings: { duration: 240, difficulty: DIFF } });
+  var s = new Sim({ roster: roster, seed: 1000 + mi * 77, settings: { duration: 240, difficulty: DIFF, arena: ARENA } });
   var ai = new AI(s);
   s.players.forEach(function (p) { ai.addBot(p.id, DIFF); });
   var stuck = {}, lastPos = {}, deckT = {};
@@ -38,6 +39,7 @@ for (var mi = 0; mi < N; mi++) {
       }
       if (x.t === 'ballReset') totals.resets++;
       if (x.t === 'overtime') totals.ot++;
+      if (x.t === 'fell') totals.falls = (totals.falls || 0) + 1;
     }
     // invariants
     var b = s.ball;

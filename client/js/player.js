@@ -17,7 +17,8 @@
     this.local = !!opts.local;
     this.teamCss = opts.teamCss;
     this.cos = opts.cosmetics;
-    this.ch = BBA.Character.build({ cosmetics: opts.cosmetics, teamColor: opts.teamCss[p.team], number: opts.number });
+    this.ch = BBA.Character.build({ cosmetics: opts.cosmetics, teamColor: opts.teamCss[p.team], number: opts.number,
+      jerseyName: (opts.cosmetics && opts.cosmetics.jerseyName) ? opts.cosmetics.jerseyName : p.name });
     scene.add(this.ch.root);
     if (this.local) { this.ch.ring.material.opacity = 1; this.ch.ring.scale.setScalar(1.15); }
     this.prev = { x: p.x, y: p.y, z: p.z, yaw: p.yaw };
@@ -109,6 +110,36 @@
     tag.style.transform = 'translate(' + Math.round(sx) + 'px,' + Math.round(sy) + 'px) translate(-50%,-100%)';
     var dist = camera.position.distanceTo(this.pos);
     tag.style.opacity = off ? 0.9 : (dist > 40 ? 0.55 : 1);
+  };
+
+  PlayerView.prototype.hideForPodium = function () {
+    this.ch.root.visible = false;
+    this.tag.style.display = 'none';
+  };
+
+  /* Stand on a podium spot and loop the celebration emote. */
+  PlayerView.prototype.podiumUpdate = function (dt, x, y, z, yaw, camera, style, t, first) {
+    var ch = this.ch;
+    ch.root.visible = true;
+    ch.root.position.set(x, y, z);
+    ch.root.rotation.y = yaw;
+    ch.ring.visible = false;
+    this.pos.set(x, y, z);
+    var loop = 1.4 - (t % 1.4);
+    BBA.Anim.update(ch, {
+      speed: 0, vy: 0, grounded: true, state: 'normal', hasBall: false, charging: false, charge: 0, wobble: 0,
+      throwAnim: 0, celebrateT: Math.max(0.01, loop), sprinting: false, accel: 0, yawRate: 0, landImpact: 0,
+      celebration: style, victory: this.cos.victory, ended: null
+    }, dt);
+    var tag = this.tag;
+    tmpV.set(x, y + 2.3 + (first ? 0.8 : 0), z);
+    tmpV.project(camera);
+    var sx = (tmpV.x * 0.5 + 0.5) * root.innerWidth, sy = (-tmpV.y * 0.5 + 0.5) * root.innerHeight;
+    tag.style.display = '';
+    tag.classList.remove('edge'); tag.classList.remove('calling'); tag.classList.remove('hasball');
+    tag.classList.add('podium');
+    tag.style.opacity = 1;
+    tag.style.transform = 'translate(' + Math.round(sx) + 'px,' + Math.round(sy) + 'px) translate(-50%,-100%)';
   };
 
   PlayerView.prototype.dispose = function () {

@@ -33,13 +33,25 @@
       return;
     }
     G.renderer = renderer;
+    // Phones can drop the WebGL context under memory pressure (shows as a black screen
+    // with the HUD still on top). Let three.js restore it instead of staying black.
+    canvas.addEventListener('webglcontextlost', function (e) {
+      e.preventDefault();
+      G.contextLost = true;
+      BBA.UI.gfxNotice(true);
+    }, false);
+    canvas.addEventListener('webglcontextrestored', function () {
+      G.contextLost = false;
+      BBA.UI.gfxNotice(false);
+      G.applyGraphics();
+    }, false);
     renderer.shadowMap.enabled = !!S.shadows;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     G.scene = new THREE.Scene();
     G.camera = new THREE.PerspectiveCamera(64, 1, 0.1, 900);
     G.rig = new BBA.CameraRig(G.camera);
     G.teamCss = BBA.Settings.teamColors();
-    G.arena = new BBA.ArenaView(G.scene, { teamCss: G.teamCss, mobile: BBA.Settings.isMobile });
+    G.arena = new BBA.ArenaView(G.scene, { arena: BBA.Arenas.get('bean_bowl'), teamCss: G.teamCss, mobile: BBA.Settings.isMobile });
     G.ballView = new BBA.BallView(G.scene, C.BALL.radius);
     G.fx = new BBA.Effects(G.scene, BBA.Settings.isMobile);
     G._buildArc();
@@ -51,7 +63,7 @@
 
     BBA.Controls.init(canvas);
     BBA.Controls.onPause = function () { G.togglePause(); };
-    BBA.Controls.onLockLost = function () { if ((G.mode === 'match' || G.mode === 'tutorial' || G.mode === 'online') && !G.paused && !G.resultsShown) { G.lockLostT = performance.now(); G.pause(true); } };
+    BBA.Controls.onLockLost = function () { if ((G.mode === 'match' || G.mode === 'tutorial' || G.mode === 'online') && !G.paused && !G.resultsShown && !(G.sim && G.sim.match.phase === 'ended')) { G.lockLostT = performance.now(); G.pause(true); } };
     BBA.Controls.onDeviceChange = function (d) { BBA.UI.onDevice(d); };
     function unlock() { BBA.Audio.unlock(); }
     root.document.addEventListener('pointerdown', unlock);
@@ -113,9 +125,134 @@
     G.endT = -1; G.resultsShown = false;
     G.arc.visible = false; G.passRing.visible = false;
     G.arena.setOvertime(false);
+    G._endPodium();
+  };
+
+  /* ---------------- post-game podium ---------------- */
+  G._buildPodium = function () {
+    var grp = new THREE.Group(), i;
+    function numTex(n, col) {
+      var cv = root.document.createElement('canvas'); cv.width = 128; cv.height = 128;
+      var c = cv.getContext('2d'); c.fillStyle = col; c.fillRect(0, 0, 128, 128);
+      c.fillStyle = '#ffffff'; c.font = 'bold 92px Arial Black, Arial'; c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.fillText(String(n), 64, 70);
+      return new THREE.CanvasTexture(cv);
+    }
+    var spec = [[0, 1.7, '#ffc93c', 1], [-2.25, 1.15, '#c9d3e0', 2], [2.25, 0.7, '#e09a5a', 3]];
+    G.podiumSpots = [];
+    for (i = 0; i < 3; i++) {
+      var s = spec[i];
+      var side = new THREE.MeshLambertMaterial({ color: '#2a2f6a' });
+      var front = new THREE.MeshLambertMaterial({ map: numTex(s[3], '#2a2f6a') });
+      var top = new THREE.MeshLambertMaterial({ color: s[2], emissive: s[2], emissiveIntensity: 0.25 });
+      var bl = new THREE.Mesh(new THREE.BoxGeometry(2.1, s[1], 2.1), [side, side, top, side, front, side]);
+      bl.position.set(s[0], s[1] / 2, 0); bl.castShadow = true; bl.receiveShadow = true;
+      grp.add(bl);
+      var rim = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.12, 2.2), new THREE.MeshBasicMaterial({ color: s[2] }));
+      rim.position.set(s[0], s[1], 0); grp.add(rim);
+      G.podiumSpots.push({ x: s[0], y: s[1] + 0.06, z: 0 });
+    }
+    // backdrop
+    var cv2 = root.document.createElement('canvas'); cv2.width = 1024; cv2.height = 320;
+    G.podiumBannerCv = cv2;
+    G.podiumBannerTex = new THREE.CanvasTexture(cv2);
+    var banner = new THREE.Mesh(new THREE.PlaneGeometry(12, 3.75), new THREE.MeshBasicMaterial({ map: G.podiumBannerTex }));
+    banner.position.set(0, 5.2, -2.6); grp.add(banner);
+    var frame = new THREE.Mesh(new THREE.BoxGeometry(12.6, 4.3, 0.3), new THREE.MeshLambertMaterial({ color: '#1b1f5a' }));
+    frame.position.set(0, 5.2, -2.8); grp.add(frame);
+    for (i = -1; i <= 1; i += 2) {
+      var post = new THREE.Mesh(new THREE.BoxGeometry(0.4, 7.4, 0.4), new THREE.MeshLambertMaterial({ color: '#ffc93c' }));
+      post.position.set(i * 6.4, 3.7, -2.8); grp.add(post);
+    }
+    // floating crown for the MVP
+    var gold = new THREE.MeshBasicMaterial({ color: '#ffd23f' });
+    var crown = new THREE.Group();
+    var band = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.36, 0.2, 16, 1, true), gold); crown.add(band);
+    for (i = 0; i < 5; i++) {
+      var a = i / 5 * Math.PI * 2, sp = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.22, 6), gold);
+      sp.position.set(Math.sin(a) * 0.34, 0.2, Math.cos(a) * 0.34); crown.add(sp);
+    }
+    grp.add(crown); G.podiumCrown = crown;
+    grp.visible = false;
+    G.scene.add(grp);
+    G.podiumGroup = grp;
+  };
+
+  G._startPodium = function () {
+    var sim = G.sim, m = sim.match;
+    if (!G.podiumGroup) G._buildPodium();
+    var wt = m.winner, list = [], i;
+    for (i = 0; i < sim.players.length; i++) if (sim.players[i].team === wt) list.push(sim.players[i]);
+    list.sort(function (a, b) { return (b.stats.pts - a.stats.pts) || (b.stats.assists - a.stats.assists) || (b.stats.steals - a.stats.steals); });
+    G.podium = { t: 0, winners: list.map(function (p) { return p.id; }), team: wt, fx: 0 };
+    // banner
+    var c = G.podiumBannerCv.getContext('2d'), col = G.teamCss[wt];
+    c.fillStyle = '#141a4d'; c.fillRect(0, 0, 1024, 320);
+    c.fillStyle = col; c.fillRect(0, 0, 1024, 26); c.fillRect(0, 294, 1024, 26);
+    c.fillStyle = '#ffd23f'; BBA.Character.drawCrown(c, 512, 92, 46);
+    c.fillStyle = '#ffffff'; c.font = 'bold 110px Arial Black, Arial'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillText(BBA.C.TEAM_NAMES[wt] + ' WINS!', 512, 200);
+    G.podiumBannerTex.needsUpdate = true;
+    G.podiumGroup.visible = true;
+    G.rig.mode = 'podium';
+    root.document.body.classList.add('podium');
+    BBA.Audio.setCrowd(1);
+    G.arena.hype(1.5);
+    // quick flash to hide the cut
+    var fl = root.document.getElementById('flash');
+    if (fl) { fl.className = ''; void fl.offsetWidth; fl.className = 'go'; }
+  };
+
+  G._endPodium = function () {
+    G.podium = null;
+    if (G.podiumGroup) G.podiumGroup.visible = false;
+    root.document.body.classList.remove('podium');
+  };
+
+  G._updatePodium = function (dt) {
+    var P = G.podium, sim = G.sim, i;
+    P.t += dt;
+    for (i = 0; i < G.views.length; i++) {
+      var place = P.winners.indexOf(i);
+      if (place < 0 || place > 2) G.views[i].hideForPodium();
+      else {
+        var s = G.podiumSpots[place], cos = G.cosmetics[i] || {};
+        G.views[i].podiumUpdate(dt, s.x, s.y, s.z, 0, G.camera, cos.celebration || 'hop', P.t + place * 0.35, place === 0);
+      }
+    }
+    if (G.podiumCrown) {
+      var first = G.podiumSpots[0];
+      G.podiumCrown.position.set(first.x, first.y + 2.35 + Math.sin(P.t * 3) * 0.08, first.z);
+      G.podiumCrown.rotation.y += dt * 1.5;
+    }
+    // confetti + fireworks
+    P.fx -= dt;
+    if (P.fx <= 0) {
+      P.fx = 0.45;
+      var x = (Math.random() - 0.5) * 9;
+      G.fx.burst('confetti', x, 7 + Math.random() * 2, -1 + Math.random() * 2, { n: 26, colors: [G.teamCss[P.team], '#ffffff', '#ffd23f'] });
+      if (Math.random() < 0.4) G.fx.ring((Math.random() - 0.5) * 10, 9 + Math.random() * 3, -2, G.teamCss[P.team], 3, 0.6);
+    }
+    // camera: slow push-in on the podium
+    var k = Math.min(1, P.t / 5), ease = 1 - Math.pow(1 - k, 3);
+    // frame the winners in the upper half so the results sheet never covers them
+    G.camera.position.set(Math.sin(P.t * 0.25) * 0.8, 2.2 + ease * 0.2, 13 - ease * 3);
+    G.camera.fov = 52; G.camera.updateProjectionMatrix();
+    G.camera.lookAt(0, 1.0, 0);
+  };
+
+  /* switch the 3D arena to match the sim (rebuilds only when it changes) */
+  G._useArena = function (id) {
+    var def = BBA.Arenas.get(id);
+    BBA.Arena = def;
+    if (G.arena && G.arena.id === def.id) return;
+    if (G.arena) G.arena.dispose();
+    G.arena = new BBA.ArenaView(G.scene, { arena: def, teamCss: G.teamCss, mobile: BBA.Settings.isMobile });
+    G.renderer.setClearColor(def.theme && def.theme.dark ? '#05050f' : '#000000');
   };
 
   G._createViews = function () {
+    G._useArena(G.sim.arena.id);
     var sim = G.sim, i;
     var localTeam = G.localId >= 0 ? sim.players[G.localId].team : 0;
     var tagLayer = root.document.getElementById('tags');
@@ -137,6 +274,7 @@
       G.views.push(v);
     }
     G.ballView.setRadius(sim.ballRadius);
+    G._warmShaders();
   };
 
   G.startAttract = function () {
@@ -146,7 +284,8 @@
     var names = botNames(6, r), roster = [], i;
     G.cosmetics = [];
     for (i = 0; i < 6; i++) { roster.push({ team: i < 3 ? 0 : 1, name: names[i], isBot: true }); G.cosmetics.push(randomCosmetics(r)); }
-    G.sim = new BBA.Sim({ roster: roster, mode: 'attract', seed: (r() * 1e9) | 0, countdown: 0.5 });
+    var ids = BBA.Arenas.ids, aId = G.menuArena || ids[Math.floor(r() * ids.length)];
+    G.sim = new BBA.Sim({ roster: roster, mode: 'attract', seed: (r() * 1e9) | 0, countdown: 0.5, settings: { arena: aId } });
     G.ai = new BBA.AI(G.sim);
     for (i = 0; i < 6; i++) G.ai.addBot(i, 'normal');
     G._createViews();
@@ -163,6 +302,9 @@
     setup = setup || BBA.Settings.data.lastSetup;
     G.setup = setup;
     G.mode = 'match';
+    G.freePractice = false;
+    var wu = setup.warmup === undefined ? 45 : setup.warmup;
+    if (wu < 0 || wu === null) wu = Infinity;
     var S = BBA.Settings.data;
     var r = rng32((Date.now() * 7) & 0xffffff);
     var size = clamp(setup.teamSize || 3, 1, 3);
@@ -173,8 +315,8 @@
     for (i = 1; i < size; i++) { roster.push({ team: 0, name: names[ni++], isBot: true }); G.cosmetics.push(randomCosmetics(r)); }
     for (i = 0; i < size; i++) { roster.push({ team: 1, name: names[ni++], isBot: true }); G.cosmetics.push(randomCosmetics(r)); }
     G.sim = new BBA.Sim({
-      roster: roster, mode: 'match', seed: (r() * 1e9) | 0, countdown: 3.5,
-      settings: { duration: setup.duration || 240, difficulty: setup.difficulty || 'normal', modifier: setup.modifier || 'none', teamSize: size }
+      roster: roster, mode: 'match', seed: (r() * 1e9) | 0, countdown: 3.5, warmup: wu,
+      settings: { duration: setup.duration || 240, difficulty: setup.difficulty || 'normal', modifier: setup.modifier || 'none', teamSize: size, arena: setup.arena || 'bean_bowl' }
     });
     G.ai = new BBA.AI(G.sim);
     for (i = 1; i < roster.length; i++) G.ai.addBot(i, setup.difficulty || 'normal');
@@ -190,9 +332,49 @@
     BBA.Controls.gameActive = true;
     BBA.Controls.wantPointerLock = true;
     BBA.Controls.requestLock();
-    BBA.Audio.setMusic('match');
+    BBA.Audio.setMusic(wu > 0 ? 'menu' : 'match');
     BBA.Audio.setCrowd(0.5);
     G.acc = 0;
+    if (wu > 0) BBA.UI.banner('WARM-UP', 'Practice with the ball. Scores don\'t count.', 'go');
+  };
+
+  /* Free practice: just you and the ball, no clock, no score. */
+  G.startPractice = function () {
+    G._clear();
+    G.mode = 'match';
+    G.freePractice = true;
+    G.setup = null;
+    var S = BBA.Settings.data;
+    G.cosmetics = [S.cosmetics];
+    G.sim = new BBA.Sim({ roster: [{ team: 0, name: S.name || 'You', isBot: false }], mode: 'practice', seed: 7, warmup: Infinity, settings: { arena: (S.lastSetup && S.lastSetup.arena) || 'bean_bowl' } });
+    G.ai = new BBA.AI(G.sim);
+    G.localId = 0;
+    G._createViews();
+    G.rig.mode = 'follow';
+    G.rig.snapBehind(0, G.sim.players[0]);
+    G.rig.pitch = 0.42;
+    G.paused = false;
+    root.document.body.classList.remove('in-menu');
+    BBA.UI.showHUD(true);
+    BBA.Controls.gameActive = true;
+    BBA.Controls.wantPointerLock = true;
+    BBA.Controls.requestLock();
+    BBA.Audio.setMusic('menu');
+    BBA.Audio.setCrowd(0.3);
+    G.acc = 0;
+    BBA.UI.banner('PRACTICE', 'Free play. Leave from the pause menu.', 'go');
+  };
+
+  G.warmupReady = function () {
+    var sim = G.sim;
+    if (!sim || sim.match.phase !== 'warmup' || G.freePractice) return;
+    if (G.mode === 'online') {
+      G.net.myReady = !G.net.myReady;
+      BBA.Net.emit('warmupReady', { ready: G.net.myReady });
+    } else {
+      sim.setWarmupReady(G.localId, !sim.warmupReady[G.localId]);
+    }
+    BBA.Audio.play('ui');
   };
 
   G.startTutorial = function () {
@@ -273,6 +455,7 @@
       dt = Math.min(0.1, G.fpsAcc); G.fpsAcc = 0;
     }
     var ctl = BBA.Controls.poll(dt);
+    if (ctl.readyPress && G.sim && !G.paused) G.warmupReady();
     if (G.sim && (!G.paused || G.mode === 'online')) {
       G.acc += dt;
       var steps = 0;
@@ -316,11 +499,12 @@
     for (i = 0; i < roster.length; i++) {
       G.cosmetics.push(info.cosmetics[i] ? fillCos(info.cosmetics[i]) : randomCosmetics(rng32(info.seed + i * 7919)));
     }
-    G.sim = new BBA.Sim({ roster: roster, mode: 'match', seed: info.seed, settings: info.settings, countdown: 4 });
+    G.sim = new BBA.Sim({ roster: roster, mode: 'match', seed: info.seed, settings: info.settings, countdown: 4, warmup: info.warmup || 0 });
     G.sim.predictOnly = true;
+    G.freePractice = false;
     G.ai = null;
     G.localId = info.you;
-    G.net = { buf: [], pending: [], seq: 0, offset: null, corr: { x: 0, y: 0, z: 0 }, ackInput: null, lastSnapT: 0 };
+    G.net = { buf: [], pending: [], seq: 0, offset: null, corr: { x: 0, y: 0, z: 0 }, ackInput: null, lastSnapT: 0, myReady: false, wr: [0, 0] };
     G.onSnapshot(info.snapshot, true);
     G._createViews();
     var lp = G.localId >= 0 ? G.sim.players[G.localId] : G.sim.players[0];
@@ -364,6 +548,7 @@
     // match state + events apply immediately
     Protocol.decodeMatch(snap.m, sim.match);
     sim.tick = snap.k;
+    if (snap.wr) n.wr = snap.wr;
     if (snap.ev && snap.ev.length && !initial) {
       // decode the ball/players of this snapshot first so effects appear in the right place
       G._events(snap.ev);
@@ -503,6 +688,24 @@
       p = e.id !== undefined ? sim.player(e.id) : null;
       switch (e.t) {
         case 'countdown': if (!menu) { UI.banner(String(e.n), '', 'count'); BBA.Audio.play('countdown'); } break;
+        case 'warmupEnd':
+          if (!menu) {
+            UI.banner('TO YOUR DECKS!', 'Match starting', 'warn');
+            BBA.Audio.play('launch'); BBA.Audio.setMusic('match');
+            if (G.localId >= 0) { var wl = sim.players[G.localId]; G.rig.snapBehind(wl.team === 0 ? 0 : Math.PI, wl); G.rig.pitch = 0.42; }
+            if (G.net) G.net.myReady = false;
+          }
+          break;
+        case 'practiceScore':
+          if (!menu) {
+            var hp = sim.hoops[1 - e.team];
+            if (e.kind !== 'dunk') { G.fx.burst('confetti', hp.x, hp.y, hp.z, { n: 30 }); BBA.Audio.play('swish'); UI.toast(e.kind === 'long' ? 'NICE 3!' : 'NICE SHOT!'); }
+            G.arena.flashHoop(1 - e.team);
+          }
+          break;
+        case 'warmupReady':
+          if (!menu && p && e.ready && !G._isLocal(p.id) && !p.isBot) UI.feed(esc(p.name) + ' is ready');
+          break;
         case 'go': if (!menu) { UI.banner('GO!', 'Jump down and grab the ball!', 'go'); BBA.Audio.play('go'); BBA.Audio.setCrowd(0.6); } break;
         case 'jump': if (p && !menu) G.snd('jump', p.x, p.y, p.z, { vol: G._isLocal(p.id) ? 0.9 : 0.5 }); break;
         case 'land':
@@ -642,8 +845,9 @@
     var i, b = sim.ball, m = sim.match;
     if (G.mode === 'online') G._onlineRender(dt);
     var winner = m.phase === 'ended' ? m.winner : -2;
-    for (i = 0; i < G.views.length; i++) G.views[i].update(dt, (G.mode === 'online' && i !== G.localId) ? 1 : alpha, sim.players[i], sim, G.camera, winner);
-    if (G.mode === 'online' && G.localId >= 0) {
+    if (G.podium) G._updatePodium(dt);
+    else for (i = 0; i < G.views.length; i++) G.views[i].update(dt, (G.mode === 'online' && i !== G.localId) ? 1 : alpha, sim.players[i], sim, G.camera, winner);
+    if (G.mode === 'online' && G.localId >= 0 && !G.podium) {
       var cv = G.views[G.localId], cr = G.net.corr;
       cv.pos.x += cr.x; cv.pos.y += cr.y; cv.pos.z += cr.z;
       cv.ch.root.position.copy(cv.pos);
@@ -661,6 +865,7 @@
     }
     bs.vx = b.vx; bs.vy = b.vy; bs.vz = b.vz; bs.state = b.state;
     bs.holderTeam = b.holder >= 0 ? sim.players[b.holder].team : -1;
+    if (G.podium) bs.state = 'gone';
     G.ballView.update(dt, bs, G.teamCss, Arena.groundHeight);
     G.arena.update(dt, G.mode === 'online' ? (G.renderSimTime || 0) : sim.time + G.acc, sim.settings.obstacles);
     G.arena.setScoreboard(m.score, m.clock, m.overtime, m.phase === 'ended' ? 'FINAL' : (m.overtime ? 'OVERTIME' : ''));
@@ -673,12 +878,16 @@
       var lp = sim.players[G.localId], lv = G.views[G.localId];
       if (m.phase === 'ended' && G.endT >= 0) {
         G.endT += dt;
-        if (G.endT > 1.2 && G.rig.mode !== 'end') { G.rig.mode = 'end'; G.rig.pos.copy(G.camera.position); }
-        var wt = m.winner >= 0 ? m.winner : lp.team, cx = 0, cy = 0, cz = 0, n = 0;
-        for (i = 0; i < sim.players.length; i++) { var q = sim.players[i]; if (q.team === wt && !q.hidden) { cx += q.x; cy += q.y; cz += q.z; n++; } }
-        if (n) { cx /= n; cy /= n; cz /= n; }
-        G.rig.update(dt, { x: cx, y: cy, z: cz }, null, ballVis);
-        if (G.endT > 3.2 && !G.resultsShown) { G.resultsShown = true; BBA.UI.showResults(sim, G.localId, G.teamCss); }
+        if (G.endT > 1.2 && G.rig.mode !== 'end' && !G.podium) { G.rig.mode = 'end'; G.rig.pos.copy(G.camera.position); }
+        if (G.endT > 2.2 && !G.podium && m.winner >= 0) G._startPodium();
+        if (!G.podium) {
+          var wt = m.winner >= 0 ? m.winner : lp.team, cx = 0, cy = 0, cz = 0, n = 0;
+          for (i = 0; i < sim.players.length; i++) { var q = sim.players[i]; if (q.team === wt && !q.hidden) { cx += q.x; cy += q.y; cz += q.z; n++; } }
+          if (n) { cx /= n; cy /= n; cz /= n; }
+          G.rig.update(dt, { x: cx, y: cy, z: cz, vx: 0, vz: 0, speed: 0 }, null, ballVis);
+        }
+        var resAt = G.podium ? 2.6 : 3.2, resT = G.podium ? G.podium.t : G.endT;
+        if (resT > resAt && !G.resultsShown) { G.resultsShown = true; BBA.UI.showResults(sim, G.localId, G.teamCss, !!G.podium); }
       } else {
         var aiming = lp.charging || (lp.passHeld && lp.passT > 0.2) || (ctl && ctl.held.aim);
         G.rig.update(dt, {
@@ -691,12 +900,33 @@
     } else {
       G.rig.update(dt, null, null, ballVis);
     }
+    // safety net: never render from a broken camera (a NaN would draw an all-black frame)
+    var cp = G.camera.position;
+    if (!isFinite(cp.x) || !isFinite(cp.y) || !isFinite(cp.z) || !isFinite(G.camera.fov)) {
+      G._recoverCamera();
+    }
+    if (G.contextLost) return;
     var sceneToRender = (BBA.UI.current === 'customize') ? G.pScene : G.scene;
     if (sceneToRender === G.pScene) G._updatePreview(dt);
     G.renderer.render(sceneToRender, sceneToRender === G.pScene ? G.pCam : G.camera);
   };
 
   /* ---------------- aiming helpers (shot arc + pass target) ---------------- */
+  G._recoverCamera = function () {
+    var R = G.rig, lp = G.localId >= 0 && G.sim ? G.sim.players[G.localId] : null;
+    R.yaw = isFinite(R.yaw) ? R.yaw : 0; R.pitch = 0.35; R.dist = 7.5; R.fov = 64; R.trauma = 0; R.shoulder = 0;
+    if (lp && isFinite(lp.x)) R.tgt.set(lp.x, lp.y + 1.6, lp.z); else R.tgt.set(0, 2, 0);
+    R.pos.set(R.tgt.x, R.tgt.y + 4, R.tgt.z - 8);
+    G.camera.position.copy(R.pos); G.camera.fov = 64; G.camera.updateProjectionMatrix();
+    G.camera.lookAt(R.tgt);
+    if (root.console) console.warn('Bean Ball: camera recovered from an invalid state');
+  };
+
+  /* compile shaders for everything in view up front so the first match frame never stalls */
+  G._warmShaders = function () {
+    try { G.renderer.compile(G.scene, G.camera); } catch (e) {}
+  };
+
   G._buildArc = function () {
     var n = 48, pos = new Float32Array(n * 3);
     var geo = new THREE.BufferGeometry();
@@ -766,7 +996,7 @@
   G.refreshPreview = function () {
     if (G.pChar) { G.pScene.remove(G.pChar.root); BBA.Character.dispose(G.pChar); }
     var cos = BBA.Settings.data.cosmetics;
-    G.pChar = BBA.Character.build({ cosmetics: cos, teamColor: G.teamCss[0], number: cos.number });
+    G.pChar = BBA.Character.build({ cosmetics: cos, teamColor: G.teamCss[0], number: cos.number, jerseyName: cos.jerseyName || BBA.Settings.data.name });
     G.pChar.ring.visible = false;
     G.pScene.add(G.pChar.root);
     G.pCelebrate = 0;
@@ -781,7 +1011,7 @@
     G.pCam.position.set(ox, 1.6, 6.4);
     G.pCam.lookAt(ox, 1.0, 0);
     G.pChar.root.position.x = 0;
-    G.pSpin += dt * (G.pDrag ? 0 : 0.6);
+    if (G.pHoldT > 0) G.pHoldT -= dt; else G.pSpin += dt * (G.pDrag ? 0 : 0.6);
     G.pChar.root.rotation.y = G.pSpin;
     if (G.pCelebrate > 0) G.pCelebrate -= dt;
     BBA.Anim.update(G.pChar, {
@@ -796,8 +1026,11 @@
   /* Colorblind toggle: rebuild team-colored visuals without touching the sim */
   G.rebuildTeamColors = function () {
     G.teamCss = BBA.Settings.teamColors();
+    if (G.pChar) { G.pScene.remove(G.pChar.root); BBA.Character.dispose(G.pChar); }
+    if (G.podiumGroup) { G.scene.remove(G.podiumGroup); G.podiumGroup = null; }
+    var aid = G.arena ? G.arena.id : 'bean_bowl';
     G.arena.dispose();
-    G.arena = new BBA.ArenaView(G.scene, { teamCss: G.teamCss, mobile: BBA.Settings.isMobile });
+    G.arena = new BBA.ArenaView(G.scene, { arena: BBA.Arenas.get(aid), teamCss: G.teamCss, mobile: BBA.Settings.isMobile });
     if (G.sim) {
       for (var i = 0; i < G.views.length; i++) G.views[i].dispose();
       G.views = [];
@@ -807,6 +1040,7 @@
   };
 
   G.previewCelebrate = function () { G.pCelebrate = 1.4; };
+  G.previewShowBack = function () { G.pSpin = Math.PI; G.pHoldT = 1.6; };
   G.previewVictory = function () { G.pVictory = 3.2; };
 
   BBA.Game = G;

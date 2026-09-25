@@ -35,6 +35,8 @@
 
   CameraRig.prototype.snapBehind = function (yaw, focus) {
     this.yaw = yaw; this.pitch = 0.32;
+    // full reset so nothing from a previous match (end camera, shake) carries over
+    this.dist = 7.5; this.fov = 64; this.shoulder = 0; this.trauma = 0; this.ballCamT = 0; this.idleLook = 0;
     if (focus) { this.tgt.set(focus.x, focus.y + 1.6, focus.z); }
     this.snapped = true;
   };
@@ -49,6 +51,10 @@
     var S = BBA.Settings.data;
     if (this.mode === 'orbit') return this._orbit(dt, ball);
     if (this.mode === 'end') return this._end(dt, f);
+    if (!f) return;
+    // tolerate partial focus data (never let a missing field become NaN)
+    f.speed = f.speed || 0; f.vx = f.vx || 0; f.vz = f.vz || 0;
+    f.sprinting = !!f.sprinting; f.aiming = !!f.aiming; f.hasBall = !!f.hasBall; f.airborne = !!f.airborne;
 
     var lookX = ctl ? ctl.lookX : 0, lookY = ctl ? ctl.lookY : 0;
     this.yaw = wrap(this.yaw - lookX);
@@ -135,8 +141,8 @@
     this.tgt.x += (bx * 0.6 - this.tgt.x) * damp(0.8, dt);
     this.tgt.z += (bz * 0.6 - this.tgt.z) * damp(0.8, dt);
     this.tgt.y = 2;
-    var r = 34;
-    this.cam.position.set(this.tgt.x + Math.sin(this.orbitA) * r, 17, this.tgt.z + Math.cos(this.orbitA) * r * 1.2);
+    // stay inside the stadium so the stands' roofs never block the view
+    this.cam.position.set(Math.sin(this.orbitA) * 16, 14, Math.cos(this.orbitA) * 27);
     this.cam.fov = 55; this.cam.updateProjectionMatrix();
     this.cam.lookAt(this.tgt.x, 2, this.tgt.z);
   };

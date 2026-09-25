@@ -41,7 +41,7 @@ function connected(s) { return new Promise(function (r) { if (s.connected) r(); 
   ok(teamB === 0, 'switch team moves Friend onto Blue with Wes', 'team ' + teamB);
   B.emit('setSettings', { duration: 5 }); await wait(100);
   ok(lobbyA.settings.duration !== 5, 'non-host cannot change settings');
-  A.emit('setSettings', { duration: 60, difficulty: 'hard', autoFillBots: false }); await wait(120);
+  A.emit('setSettings', { duration: 60, difficulty: 'hard', autoFillBots: false, warmup: 30 }); await wait(120);
   ok(lobbyA.settings.duration === 60 && lobbyA.settings.difficulty === 'hard', 'host changes settings');
   A.emit(EV.addBot, { team: 1 }); A.emit(EV.addBot, { team: 1 }); A.emit(EV.addBot, { team: 0 }); await wait(150);
   var red = lobbyA.teams[1].filter(function (s) { return s.kind === 'bot'; }).length;
@@ -62,6 +62,13 @@ function connected(s) { return new Promise(function (r) { if (s.connected) r(); 
   await wait(300);
   ok(startA && startB && startA.you !== startB.you, 'both get matchStart with different player slots', startA && startA.you + ' / ' + startB.you);
   ok(startA.roster.length === 5, '2 humans + 3 bots in roster (2v... with auto-fill off)', startA.roster.map(function (r) { return r.name + (r.isBot ? '*' : ''); }).join(','));
+  var ph0 = snapsA.length ? snapsA[snapsA.length - 1].s.m[0] : '?';
+  ok(ph0 === 'warmup', 'match opens with a warm-up', ph0);
+  ok(snapsA[snapsA.length - 1].s.wr[1] === 2, 'server tracks 2 humans for ready-up');
+  A.emit('warmupReady', { ready: true }); await wait(250);
+  ok(snapsA[snapsA.length - 1].s.m[0] === 'warmup' && snapsA[snapsA.length - 1].s.wr[0] === 1, 'one ready is not enough');
+  B.emit('warmupReady', { ready: true }); await wait(300);
+  ok(snapsA[snapsA.length - 1].s.m[0] === 'countdown', 'everyone ready ends the warm-up', snapsA[snapsA.length - 1].s.m[0]);
   // send inputs from B: run forward for 5 seconds
   var seq = 0, youB = startB.you, t0 = Date.now();
   var sendLoop = setInterval(function () {
@@ -103,7 +110,11 @@ function connected(s) { return new Promise(function (r) { if (s.connected) r(); 
 
   console.log('match end (60 s match, waiting)…');
   var tEnd = Date.now();
-  while (!endRes && Date.now() - tEnd < 90000) await wait(500);
+  var lastLog = 0;
+  while (!endRes && Date.now() - tEnd < 200000) {
+    await wait(500);
+    if (Date.now() - lastLog > 15000) { lastLog = Date.now(); var sm = snapsA[snapsA.length - 1]; console.log('    ...', JSON.stringify(sm.s.m), 'snaps', snapsA.length, 'age', Date.now() - sm.at); }
+  }
   ok(!!endRes, 'match ends and results are sent', endRes && ('score ' + endRes.score.join('-') + ' winner ' + endRes.winner));
   var goal = Date.now();
   while (lobbyA.state !== 'lobby' && Date.now() - goal < 15000) await wait(300);

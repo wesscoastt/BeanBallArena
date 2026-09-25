@@ -29,16 +29,16 @@
     keys: {
       forward: ['KeyW', 'ArrowUp'], back: ['KeyS', 'ArrowDown'], left: ['KeyA', 'ArrowLeft'], right: ['KeyD', 'ArrowRight'],
       jump: ['Space'], sprint: ['ShiftLeft', 'ShiftRight'], dive: ['KeyC', 'ControlLeft'], grab: ['Mouse0', 'KeyE'],
-      shoot: ['Mouse2', 'KeyR'], pass: ['KeyQ'], ballcam: ['KeyF'], aim: ['KeyV'], pause: ['Escape', 'KeyP']
+      shoot: ['Mouse2', 'KeyR'], pass: ['KeyQ'], ballcam: ['KeyF'], aim: ['KeyV'], pause: ['Escape', 'KeyP'], ready: ['Enter']
     },
     pad: {
-      jump: 0, pass: 1, dive: 2, ballcam: 3, sprint: 4, shoot: 5, aim: 6, grab: 7, pause: 9, sprintAlt: 10
+      jump: 0, pass: 1, dive: 2, ballcam: 3, sprint: 4, shoot: 5, aim: 6, grab: 7, ready: 8, pause: 9, sprintAlt: 10
     },
     // match setup memory
-    lastSetup: { teamSize: 3, duration: 240, difficulty: 'normal', modifier: 'none' },
+    lastSetup: { teamSize: 3, duration: 240, difficulty: 'normal', modifier: 'none', warmup: 45 },
     cosmetics: {
       color: '#ffd23f', pattern: 'solid', color2: '#ffffff', face: 'classic', hat: 'none',
-      upper: 'jersey', lower: 'shorts', celebration: 'hop', victory: 'backflip', number: 7
+      upper: 'jersey', lower: 'shorts', celebration: 'hop', victory: 'backflip', number: 7, jerseyName: '', jerseyColor: 'team'
     }
   };
 

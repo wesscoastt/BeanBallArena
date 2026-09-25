@@ -6,7 +6,7 @@
   var BBA = root.BBA = root.BBA || {};
   var doc = root.document;
 
-  var ACTIONS = ['jump', 'sprint', 'dive', 'grab', 'pass', 'shoot', 'aim', 'ballcam'];
+  var ACTIONS = ['jump', 'sprint', 'dive', 'grab', 'pass', 'shoot', 'aim', 'ballcam', 'ready'];
 
   var C = {
     keys: {},            // code -> down
@@ -27,7 +27,7 @@
   };
 
   function emptyState() {
-    return { mx: 0, my: 0, lookX: 0, lookY: 0, held: { jump: false, sprint: false, dive: false, grab: false, pass: false, shoot: false, aim: false, ballcam: false }, device: C.device, pause: false, ballcamPress: false };
+    return { mx: 0, my: 0, lookX: 0, lookY: 0, held: { jump: false, sprint: false, dive: false, grab: false, pass: false, shoot: false, aim: false, ballcam: false, ready: false }, device: C.device, pause: false, ballcamPress: false };
   }
 
   function bound(action, code) {
@@ -52,6 +52,7 @@
       C.keys[e.code] = true;
       if (C.device !== 'kbm') C.setDevice('kbm');
       if (bound('pause', e.code) && C.onPause) C.onPause();
+      if (bound('ready', e.code) && !e.repeat) C.readyQueued = true; // never miss a quick tap between frames
       // menu nav via keyboard arrows is handled by the browser focus; we also map for consistency
       if (C.onNav && !C.gameActive) {
         if (e.code === 'ArrowUp') { C.onNav('up'); e.preventDefault(); }
@@ -193,6 +194,7 @@
       h.shoot = h.shoot || pressedNow[map.shoot];
       h.aim = h.aim || pressedNow[map.aim];
       h.grab = h.grab || pressedNow[map.grab];
+      h.ready = h.ready || pressedNow[map.ready === undefined ? 8 : map.ready];
     }
     C.padPrev = pressedNow;
   };
@@ -388,6 +390,9 @@
     st.device = C.device;
     st.ballcamPress = h.ballcam && !C.edgePrev.ballcam;
     C.edgePrev.ballcam = h.ballcam;
+    st.readyPress = (h.ready && !C.edgePrev.ready) || !!C.readyQueued;
+    C.readyQueued = false;
+    C.edgePrev.ready = h.ready;
     C.state = st;
     return st;
   };

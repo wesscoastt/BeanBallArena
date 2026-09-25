@@ -14,10 +14,10 @@
   var isNode = (typeof module === 'object' && module.exports);
   var deps = isNode
     ? [require('./constants.js'), require('./gameRules.js'), require('./arenaDef.js')]
-    : [root.BBA.C, root.BBA.Rules, root.BBA.Arena];
+    : [root.BBA.C, root.BBA.Rules, root.BBA.Arenas];
   var mod = factory(deps[0], deps[1], deps[2]);
   if (isNode) { module.exports = mod; } else { root.BBA.Sim = mod; }
-})(this, function (C, Rules, Arena) {
+})(this, function (C, Rules, Arenas) {
   var P = C.PLAYER, B = C.BALL, SH = C.SHOT, DK = C.DUNK;
   var BTN = C.BUTTONS;
 
@@ -50,8 +50,8 @@
     this.tick = 0;
     this.players = [];
     this.events = [];
-    this.arena = Arena;
-    this.hoops = Arena.hoops;
+    this.arena = Arenas.get(this.settings.arena);
+    this.hoops = this.arena.hoops;
     this.ball = this._newBall();
     this.match = {
       phase: 'countdown', phaseT: 0, countdown: opts.countdown === undefined ? 3 : opts.countdown,
@@ -68,7 +68,65 @@
     }
     this._applyModifier();
     this._placeBallSpawn(true);
+    // Warm-up: run around the court with the ball before the real match (Crown Jam style)
+    this.warmup = opts.warmup || 0;           // seconds, Infinity = free practice
+    this.warmupReady = {};
+    this.warmBallT = 0;
+    if (this.warmup > 0) {
+      this.match.phase = 'warmup';
+      this._warmupPositions();
+      this._dropBall();
+    }
   }
+
+  Sim.prototype._warmupPositions = function () {
+    var counts = [0, 0];
+    for (var i = 0; i < this.players.length; i++) {
+      var p = this.players[i], k = counts[p.team]++;
+      var side = p.team === 0 ? -1 : 1;
+      var ws = this.arena.warmSpots(p.team, k);
+      p.x = ws.x; p.z = ws.z; p.y = this.arena.groundHeight(p.x, p.z);
+      p.vx = 0; p.vy = 0; p.vz = 0; p.grounded = true;
+      p.yaw = p.team === 0 ? 0 : Math.PI;
+    }
+  };
+
+  Sim.prototype.setWarmupReady = function (pid, ready) {
+    if (this.match.phase !== 'warmup' || !this.players[pid]) return;
+    if (ready === false) delete this.warmupReady[pid]; else this.warmupReady[pid] = true;
+    this.emit({ t: 'warmupReady', id: pid, ready: ready !== false });
+  };
+
+  Sim.prototype.warmupReadyCount = function () {
+    var humans = 0, ready = 0;
+    for (var i = 0; i < this.players.length; i++) {
+      if (this.players[i].isBot) continue;
+      humans++; if (this.warmupReady[i]) ready++;
+    }
+    return { humans: humans, ready: ready };
+  };
+
+  Sim.prototype._endWarmup = function () {
+    var m = this.match, i;
+    this._forceRelease();
+    for (i = 0; i < this.players.length; i++) {
+      var p = this.players[i];
+      if (p.grabTarget >= 0) this._releaseGrab(p);
+    }
+    for (i = 0; i < this.players.length; i++) {
+      var q = this.players[i];
+      q.x = q.spawnX; q.z = q.spawnZ; q.y = this.arena.groundHeight(q.x, q.z);
+      q.vx = 0; q.vy = 0; q.vz = 0; q.grounded = true; q.hidden = false;
+      q.state = 'normal'; q.stateT = 0; q.dunk = null; q.charging = false; q.passHeld = false;
+      q.grabbedBy = -1; q.grabTarget = -1; q.celebrateT = 0; q.callT = 0; q.launchT = 0; q.stunImmune = 0;
+      q.yaw = q.team === 0 ? 0 : Math.PI;
+      q.stats = { pts: 0, dunks: 0, shots: 0, made: 0, passes: 0, steals: 0, tackles: 0, intercepts: 0, assists: 0 };
+    }
+    this._placeBallSpawn(true);
+    this.warmBallT = 0;
+    m.phase = 'countdown'; m.phaseT = 0; m.lastSec = -1;
+    this.emit({ t: 'warmupEnd' });
+  };
 
   Sim.emptyInput = emptyInput;
   Sim.clamp = clamp;
@@ -84,8 +142,9 @@
     if (s.modifier === 'megaball') this.physMul.ballR = 1.8;
     if (s.modifier === 'turbo') this.physMul.speed = 1.3;
     this.ballRadius = B.radius * this.physMul.ballR;
-    this.gPlayer = P.gravity * this.physMul.gravity;
-    this.gBall = B.gravity * this.physMul.gravity * this.physMul.ballG;
+    var ag = this.arena ? this.arena.gravity : 1;
+    this.gPlayer = P.gravity * this.physMul.gravity * ag;
+    this.gBall = B.gravity * this.physMul.gravity * this.physMul.ballG * ag;
   };
 
   Sim.prototype._newBall = function () {
@@ -99,10 +158,10 @@
   };
 
   Sim.prototype._newPlayer = function (id, info, slot) {
-    var sp = Arena.spawns[info.team][slot % Arena.spawns[info.team].length];
+    var sp = this.arena.spawns[info.team][slot % this.arena.spawns[info.team].length];
     var p = {
       id: id, team: info.team, name: info.name || ('Player ' + (id + 1)), isBot: !!info.isBot,
-      slot: slot, x: sp.x, y: Arena.groundHeight(sp.x, sp.z), z: sp.z, vx: 0, vy: 0, vz: 0,
+      slot: slot, x: sp.x, y: this.arena.groundHeight(sp.x, sp.z), z: sp.z, vx: 0, vy: 0, vz: 0,
       yaw: info.team === 0 ? 0 : Math.PI, grounded: true,
       state: 'normal', stateT: 0,
       coyote: 0, jumpBuf: 0, diveCd: 0, grabCd: 0,
@@ -162,6 +221,12 @@
   Sim.prototype._stepMatch = function (dt) {
     var m = this.match, b = this.ball;
     m.phaseT += dt;
+    if (m.phase === 'warmup') {
+      if (this.warmBallT > 0) { this.warmBallT -= dt; if (this.warmBallT <= 0) this._dropBall(); }
+      var rc = this.warmupReadyCount();
+      if (this.mode === 'match' && (m.phaseT >= this.warmup || (rc.humans > 0 && rc.ready >= rc.humans))) this._endWarmup();
+      return;
+    }
     if (m.phase === 'countdown') {
       var sec = Math.ceil(m.countdown - m.phaseT);
       if (sec !== m.lastSec && sec > 0) { m.lastSec = sec; this.emit({ t: 'countdown', n: sec }); }
@@ -256,7 +321,7 @@
   };
 
   Sim.prototype._placeBallSpawn = function (hover) {
-    var b = this.ball, s = Arena.ballSpawn;
+    var b = this.ball, s = this.arena.ballSpawn;
     b.x = s.x; b.y = s.y; b.z = s.z; b.vx = 0; b.vy = 0; b.vz = 0;
     b.prevY = b.y; b.holder = -1; b.state = hover ? 'spawn' : 'free';
     b.lastThrow = null; b.passTarget = -1; b.inFlight = false; b.idleT = 0; b.restT = 0;
@@ -314,7 +379,7 @@
     if (p.hidden) return false;
     if (p.state !== 'normal' && p.state !== 'recover') return false;
     var ph = this.match.phase;
-    return ph === 'play' || ph === 'scored' || ph === 'buzzer';
+    return ph === 'play' || ph === 'scored' || ph === 'buzzer' || ph === 'warmup';
   };
 
   Sim.prototype.canCatch = function (p) {
@@ -322,11 +387,11 @@
     if (p.state === 'stun' || p.state === 'dunk') return false;
     if (p.grabTarget >= 0) return false;
     var ph = this.match.phase;
-    return ph === 'play' || ph === 'buzzer';
+    return ph === 'play' || ph === 'buzzer' || (ph === 'warmup' && this.warmBallT <= 0);
   };
 
   Sim.prototype._supportHeight = function (x, z) {
-    var g = Arena.groundHeight, r = P.radius * 0.35;
+    var g = this.arena.groundHeight, r = P.radius * 0.35;
     var h = g(x, z), t;
     t = g(x + r, z); if (t > h) h = t;
     t = g(x - r, z); if (t > h) h = t;
@@ -336,7 +401,7 @@
   };
 
   Sim.prototype._blocked = function (x, z, y, sx, sz, grounded) {
-    var g = Arena.groundHeight, r = P.radius, lim = y + (grounded ? P.stepUp : 0.15);
+    var g = this.arena.groundHeight, r = P.radius, lim = y + (grounded ? P.stepUp : 0.15);
     if (sx !== 0) {
       var ex = x + sx * r;
       if (g(ex, z) > lim || g(x + sx * r * 0.7, z + r * 0.7) > lim || g(x + sx * r * 0.7, z - r * 0.7) > lim) return true;
@@ -504,6 +569,7 @@
       var accel;
       if (p.grounded) accel = (mag > 0.05) ? (sprint ? P.accelSprint : P.accelGround) : P.friction;
       else accel = P.accelAir;
+      if (p.grounded && this.arena.ice.length && this.arena.surface(p.x, p.z, this._sf || (this._sf = {})).ice) accel *= (mag > 0.05 ? 0.22 : 0.08); // slippery
       if (p.launchT > 0) accel = 2;
       if (!p.grounded && mag < 0.05) accel = 2; // keep momentum in air
       var dvx = desX - p.vx, dvz = desZ - p.vz;
@@ -536,7 +602,7 @@
 
     // spawn-deck conveyor (only once the match is live)
     if (p.grounded && !frozen) {
-      var cv = Arena.conveyor(p.x, p.z);
+      var cv = this.arena.conveyor(p.x, p.z, this._sf || (this._sf = {}));
       if (cv) { p.x += cv.x * dt; p.z += cv.z * dt; }
     }
     this._moveBody(p, dt);
@@ -544,13 +610,13 @@
     this._obstacles(p, dt);
 
     // stuck in geometry safety
-    var gh = Arena.groundHeight(p.x, p.z);
+    var gh = this.arena.groundHeight(p.x, p.z);
     if (gh > p.y + 1.2) { p.y = gh; p.vy = 0; }
     if (!this.predictOnly && (p.y < -6 || p.x !== p.x || p.z !== p.z || p.y !== p.y)) this._kill(p);
   };
 
   Sim.prototype._moveBody = function (p, dt) {
-    var r = P.radius, A = Arena;
+    var r = P.radius, A = this.arena;
     var nx = p.x + p.vx * dt;
     var sx = p.vx > 0 ? 1 : (p.vx < 0 ? -1 : 0);
     if (sx !== 0 && this._blocked(nx, p.z, p.y, sx, 0, p.grounded)) { p.vx = -p.vx * 0.1; nx = p.x; }
@@ -561,11 +627,12 @@
     p.z = nz;
 
     // arena walls
-    var lx = A.halfW - r, lz = A.halfL - r;
-    if (p.x > lx) { p.x = lx; if (p.vx > 0) p.vx = 0; }
-    if (p.x < -lx) { p.x = -lx; if (p.vx < 0) p.vx = 0; }
-    if (p.z > lz) { p.z = lz; if (p.vz > 0) p.vz = 0; }
-    if (p.z < -lz) { p.z = -lz; if (p.vz < 0) p.vz = 0; }
+    var lx = A.halfW - r, lz = A.halfL - r, bw = A.bounceWalls, hit = 0;
+    if (p.x > lx) { p.x = lx; if (p.vx > 0) { hit = p.vx; p.vx = bw ? -p.vx * 0.9 - 2 : 0; } }
+    if (p.x < -lx) { p.x = -lx; if (p.vx < 0) { hit = -p.vx; p.vx = bw ? -p.vx * 0.9 + 2 : 0; } }
+    if (p.z > lz) { p.z = lz; if (p.vz > 0) { hit = p.vz; p.vz = bw ? -p.vz * 0.9 - 2 : 0; } }
+    if (p.z < -lz) { p.z = -lz; if (p.vz < 0) { hit = -p.vz; p.vz = bw ? -p.vz * 0.9 + 2 : 0; } }
+    if (bw && hit > 4 && !this.predictOnly) { p.wobble = Math.max(p.wobble, 0.6); this.emit({ t: 'bumper', id: p.id, x: p.x, z: p.z, wall: true }); }
 
     // backboards
     for (var i = 0; i < 2; i++) {
@@ -604,7 +671,7 @@
 
   Sim.prototype._stepPads = function (p) {
     if (p.padCd > 0) return;
-    var pads = Arena.pads;
+    var pads = this.arena.pads;
     for (var i = 0; i < pads.length; i++) {
       var pd = pads[i];
       var dx = p.x - pd.x, dz = p.z - pd.z;
@@ -627,7 +694,23 @@
   };
 
   Sim.prototype._obstacles = function (p, dt) {
-    var A = Arena, r = P.radius, i;
+    var A = this.arena, r = P.radius, i;
+    // swinging pendulums (pirate cannonballs)
+    var sw = this._swp || (this._swp = {});
+    for (i = 0; i < A.swingers.length; i++) {
+      var s0 = A.swingers[i];
+      A.swingPos(s0, this.time, this.settings.obstacles, sw);
+      if (p.y > sw.y + s0.r || p.y + P.height < sw.y - s0.r) continue;
+      var sdx = p.x - sw.x, sdz = p.z - sw.z, sd = Math.sqrt(sdx * sdx + sdz * sdz), slim = s0.r + r;
+      if (sd >= slim) continue;
+      if (sd < 0.001) { sdx = 1; sdz = 0; sd = 1; }
+      p.x = sw.x + sdx / sd * slim; p.z = sw.z + sdz / sd * slim;
+      p.vx = sdx / sd * 4.5 + sw.vx * 0.45; p.vz = sdz / sd * 4.5 + sw.vz * 0.45;
+      p.vy = Math.max(p.vy, 5); p.grounded = false;
+      p.wobble = 1.2;
+      if (!this.predictOnly && p.stunImmune <= 0 && p.state !== 'stun' && p.state !== 'dunk') this._stun(p, 0.55, true);
+      if (!this.predictOnly) this.emit({ t: 'bumper', id: p.id, x: sw.x, z: sw.z, swing: true });
+    }
     // bumper posts
     for (i = 0; i < A.posts.length; i++) {
       var po = A.posts[i];
@@ -687,7 +770,7 @@
 
   Sim.prototype._respawn = function (p) {
     p.hidden = false;
-    p.x = p.spawnX; p.z = p.spawnZ; p.y = Arena.groundHeight(p.x, p.z) + 0.2; p.vx = 0; p.vy = 0; p.vz = 0;
+    p.x = p.spawnX; p.z = p.spawnZ; p.y = this.arena.groundHeight(p.x, p.z) + 0.2; p.vx = 0; p.vy = 0; p.vz = 0;
     p.state = 'normal'; p.stateT = 0; p.stunImmune = 1.5;
     p.yaw = p.team === 0 ? 0 : Math.PI;
     this.emit({ t: 'respawn', id: p.id });
@@ -731,7 +814,7 @@
     if (b.holder !== p.id) return;
     var hp = this.holdPos(p);
     b.holder = -1; b.state = 'free';
-    b.x = hp.x; b.y = Math.max(hp.y, Arena.groundHeight(hp.x, hp.z) + this.ballRadius + 0.05); b.z = hp.z;
+    b.x = hp.x; b.y = Math.max(hp.y, this.arena.groundHeight(hp.x, hp.z) + this.ballRadius + 0.05); b.z = hp.z;
     var l = Math.sqrt(dirx * dirx + dirz * dirz) || 1;
     var side = (this.rng() - 0.5) * 3;
     b.vx = dirx / l * 5 + (-dirz / l) * side;
@@ -747,7 +830,7 @@
   Sim.prototype._tryGrab = function (p) {
     var b = this.ball;
     // pickup loose ball in reach
-    var live = this.match.phase === 'play' || this.match.phase === 'buzzer';
+    var live = this.match.phase === 'play' || this.match.phase === 'buzzer' || (this.match.phase === 'warmup' && this.warmBallT <= 0);
     if (live && (b.state === 'free') && p.catchCd <= 0 && !(b.ignoreId === p.id && b.ignoreT > 0)) {
       var cx = p.x, cy = p.y + 0.95, cz = p.z;
       var dx = b.x - cx, dy = b.y - cy, dz = b.z - cz;
@@ -901,7 +984,7 @@
   Sim.prototype.dunkEligible = function (p) {
     if (this.ball.holder !== p.id || p.grounded || p.grabbedBy >= 0) return false;
     if (p.state !== 'normal' && p.state !== 'dive' && p.state !== 'recover') return false;
-    if (this.match.phase !== 'play' && this.match.phase !== 'buzzer') return false;
+    if (this.match.phase !== 'play' && this.match.phase !== 'buzzer' && this.match.phase !== 'warmup') return false;
     var h = this.attackHoop(p.team);
     var dx = h.x - p.x, dz = h.z - p.z, d = Math.sqrt(dx * dx + dz * dz);
     if (d > DK.range) return false;
@@ -972,10 +1055,10 @@
   Sim.prototype._releaseBallFrom = function (p, vx, vy, vz, kind, target) {
     var b = this.ball;
     var o = this.holdPos(p);
-    var gh = Arena.groundHeight(o.x, o.z);
+    var gh = this.arena.groundHeight(o.x, o.z);
     if (o.y < gh + this.ballRadius + 0.05) o.y = gh + this.ballRadius + 0.05;
     // keep throw origin inside the arena
-    var lx = Arena.halfW - this.ballRadius, lz = Arena.halfL - this.ballRadius;
+    var lx = this.arena.halfW - this.ballRadius, lz = this.arena.halfL - this.ballRadius;
     o.x = clamp(o.x, -lx, lx); o.z = clamp(o.z, -lz, lz);
     b.holder = -1; b.state = 'free';
     b.x = o.x; b.y = o.y; b.z = o.z; b.prevY = o.y;
@@ -1085,7 +1168,7 @@
     var g = this.gBall;
     var lead = 0.85;
     var tx = t.x + t.vx * T * lead, tz = t.z + t.vz * T * lead;
-    var ty = (t.grounded ? t.y : Math.max(Arena.groundHeight(tx, tz), t.y + t.vy * T * 0.5)) + (low ? 0.6 : 1.2);
+    var ty = (t.grounded ? t.y : Math.max(this.arena.groundHeight(tx, tz), t.y + t.vy * T * 0.5)) + (low ? 0.6 : 1.2);
     var vx, vy, vz, sp, it;
     for (it = 0; it < 4; it++) {
       vx = (tx - o.x) / T; vz = (tz - o.z) / T; vy = (ty - o.y + 0.5 * g * T * T) / T;
@@ -1135,7 +1218,7 @@
     var b = this.ball, p = this.players[b.holder];
     if (!p) { b.holder = -1; b.state = 'free'; return; }
     var hp = this.holdPos(p);
-    var lx = Arena.halfW - this.ballRadius, lz = Arena.halfL - this.ballRadius;
+    var lx = this.arena.halfW - this.ballRadius, lz = this.arena.halfL - this.ballRadius;
     b.x = clamp(hp.x, -lx, lx); b.y = hp.y; b.z = clamp(hp.z, -lz, lz); b.prevY = b.y;
     b.vx = p.vx; b.vy = p.vy; b.vz = p.vz;
   };
@@ -1181,19 +1264,19 @@
       var speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy + b.vz * b.vz);
       b.idleT += dt;
       if (speed < 0.4) b.restT += dt; else b.restT = 0;
-      var gh = Arena.groundHeight(b.x, b.z);
+      var gh = this.arena.groundHeight(b.x, b.z);
       var bad = b.x !== b.x || b.y !== b.y || b.z !== b.z || b.y < -3 ||
-        Math.abs(b.x) > Arena.halfW + 1 || Math.abs(b.z) > Arena.halfL + 1;
+        Math.abs(b.x) > this.arena.halfW + 1 || Math.abs(b.z) > this.arena.halfL + 1;
       var perched = b.restT > 2.5 && b.y - gh > this.ballRadius + 0.5; // resting on top of something weird
       if (bad || perched || b.idleT > 25 || (b.restT > 12)) {
-        if (m.phase === 'play' || this.mode !== 'match') this.resetBall(bad ? 'escaped' : 'stuck');
+        if (m.phase === 'play' || m.phase === 'warmup' || this.mode !== 'match') this.resetBall(bad ? 'escaped' : 'stuck');
       }
     }
   };
 
   /* Pure-ish ball physics. `live` = sim ball (scoring & events). For predictions pass live=false. */
   Sim.prototype.ballPhysics = function (b, dt, t, live) {
-    var A = Arena, R = this.ballRadius;
+    var A = this.arena, R = this.ballRadius;
     b.prevY = b.y;
     b.vy -= this.gBall * dt;
     var px = b.x, pz = b.z;
@@ -1201,10 +1284,10 @@
 
     // walls
     var lx = A.halfW - R, lz = A.halfL - R;
-    if (b.x > lx) { b.x = lx; if (b.vx > 0) { this._ballHit(b, live, 'wall', b.vx); b.vx = -b.vx * B.restWall; } }
-    if (b.x < -lx) { b.x = -lx; if (b.vx < 0) { this._ballHit(b, live, 'wall', -b.vx); b.vx = -b.vx * B.restWall; } }
-    if (b.z > lz) { b.z = lz; if (b.vz > 0) { this._ballHit(b, live, 'wall', b.vz); b.vz = -b.vz * B.restWall; } }
-    if (b.z < -lz) { b.z = -lz; if (b.vz < 0) { this._ballHit(b, live, 'wall', -b.vz); b.vz = -b.vz * B.restWall; } }
+    if (b.x > lx) { b.x = lx; if (b.vx > 0) { this._ballHit(b, live, 'wall', b.vx); b.vx = -b.vx * A.wallRest; } }
+    if (b.x < -lx) { b.x = -lx; if (b.vx < 0) { this._ballHit(b, live, 'wall', -b.vx); b.vx = -b.vx * A.wallRest; } }
+    if (b.z > lz) { b.z = lz; if (b.vz > 0) { this._ballHit(b, live, 'wall', b.vz); b.vz = -b.vz * A.wallRest; } }
+    if (b.z < -lz) { b.z = -lz; if (b.vz < 0) { this._ballHit(b, live, 'wall', -b.vz); b.vz = -b.vz * A.wallRest; } }
     if (b.y > A.ceiling - R) { b.y = A.ceiling - R; if (b.vy > 0) b.vy = -b.vy * 0.5; }
 
     // vertical faces of the height field (platform sides, rails, poles)
@@ -1238,10 +1321,10 @@
         }
       }
       b.grounded = true;
-      var fr = Math.max(0, 1 - B.rollFriction * dt);
+      var sfb = A.surface(b.x, b.z, this._sfb || (this._sfb = {}));
+      var fr = Math.max(0, 1 - B.rollFriction * (sfb.ice ? 0.15 : 1) * dt);
       b.vx *= fr; b.vz *= fr;
-      var cvb = A.conveyor(b.x, b.z);
-      if (cvb) { b.vz += cvb.z * 3 * dt; }
+      if (sfb.moving) { var kk = Math.min(1, 2.5 * dt); b.vx += (sfb.vx - b.vx) * kk * (sfb.vx ? 1 : 0); b.vz += (sfb.vz - b.vz) * kk * (sfb.vz ? 1 : 0); }
     }
 
     // pads
@@ -1254,6 +1337,19 @@
       }
     }
 
+    // swinging pendulums
+    for (i = 0; i < A.swingers.length; i++) {
+      var sg = A.swingers[i], sp2 = A.swingPos(sg, t, this.settings.obstacles, this._swb || (this._swb = {}));
+      var ex = b.x - sp2.x, ey = b.y - sp2.y, ez = b.z - sp2.z, ed = Math.sqrt(ex * ex + ey * ey + ez * ez), elim = sg.r + R;
+      if (ed < elim && ed > 0.001) {
+        var nx0 = ex / ed, ny0 = ey / ed, nz0 = ez / ed;
+        b.x = sp2.x + nx0 * elim; b.y = sp2.y + ny0 * elim; b.z = sp2.z + nz0 * elim;
+        var rv = (b.vx - sp2.vx) * nx0 + b.vy * ny0 + (b.vz - sp2.vz) * nz0;
+        if (rv < 0) { b.vx -= 1.8 * rv * nx0; b.vy -= 1.8 * rv * ny0; b.vz -= 1.8 * rv * nz0; }
+        b.vx += sp2.vx * 0.6; b.vz += sp2.vz * 0.6;
+        this._ballHit(b, live, 'bumper', 6);
+      }
+    }
     // posts
     for (i = 0; i < A.posts.length; i++) {
       var po = A.posts[i];
@@ -1373,6 +1469,17 @@
 
   Sim.prototype._award = function (team, pts, kind, scorerId) {
     var m = this.match, b = this.ball;
+    if (m.phase === 'warmup') {
+      // practice basket: celebrate, don't count, new ball shortly
+      if (this.warmBallT <= 0) {
+        this.warmBallT = kind === 'dunk' ? 1.3 : 1.0;
+        var sp = this.players[scorerId];
+        if (sp) sp.celebrateT = 1.4;
+        b.lastThrow = null; b.lastPasser = -1; b.passTarget = -1;
+        this.emit({ t: 'practiceScore', team: team, pts: pts, kind: kind, scorer: scorerId });
+      }
+      return;
+    }
     if (m.phase !== 'play' && m.phase !== 'buzzer') return;
     m.score[team] += pts;
     var assist = -1;

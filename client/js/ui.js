@@ -28,6 +28,8 @@
     $('tut-skip').addEventListener('click', function () { if (UI.G.tutorial) UI.G.tutorial.finish(true); });
     $('edit-done').addEventListener('click', function () { if (BBA.Controls.stopTouchEdit) BBA.Controls.stopTouchEdit(); });
     $('pause-btn').addEventListener('click', function () { UI.G.togglePause(); });
+    $('wu-ready').addEventListener('click', function (e) { e.stopPropagation(); UI.G.warmupReady(); });
+    $('wu-ready').addEventListener('touchstart', function (e) { e.stopPropagation(); }, { passive: true });
     $('version').textContent = 'v' + C.VERSION + ' · offline build';
     var nameIn = $('cust-name');
     nameIn.addEventListener('input', function () {
@@ -35,12 +37,27 @@
       BBA.Settings.data.name = v || 'Player'; BBA.Settings.save(); UI.refreshCard();
     });
     nameIn.addEventListener('keydown', function (e) { e.stopPropagation(); if (e.key === 'Enter') nameIn.blur(); });
+    var jIn = $('cust-jersey'), jT = null;
+    jIn.addEventListener('input', function () {
+      var v = BBA.Character.cleanJerseyName(jIn.value);
+      BBA.Settings.data.cosmetics.jerseyName = v; BBA.Settings.save();
+      clearTimeout(jT); jT = setTimeout(function () { UI.G.refreshPreview(); UI.G.previewShowBack(); }, 250);
+    });
+    jIn.addEventListener('keydown', function (e) { e.stopPropagation(); if (e.key === 'Enter') jIn.blur(); });
     UI.buildArenaRow();
     UI.refreshCard();
     UI.applyUIScale();
     UI.onDevice(BBA.Controls.device);
     UI.show('main');
     BBA.Lobby.init();
+  };
+
+  UI.gfxNotice = function (on) {
+    var f = $('fatal');
+    if (on) {
+      f.innerHTML = 'Your device paused the graphics. Restoring…<br><br><button class="pbtn go" onclick="location.reload()">RELOAD GAME</button>';
+      f.classList.remove('hidden');
+    } else f.classList.add('hidden');
   };
 
   UI.fatal = function (msg) { var f = $('fatal'); f.textContent = msg; f.classList.remove('hidden'); };
@@ -67,23 +84,31 @@
     UI.updateHints();
   };
 
+  var ARENA_BG = {
+    bean_bowl: 'linear-gradient(135deg,#ff9a3a,#7a5cff 60%,#2f7bff)',
+    rooftop: 'linear-gradient(135deg,#5bc8ff,#ffb86b 70%,#4a8f4a)',
+    factory: 'linear-gradient(135deg,#5a5f6e,#e0a13a 60%,#2d3140)',
+    neon: 'linear-gradient(135deg,#2a0f5e,#d23cff 60%,#2fd3ff)',
+    pirate: 'linear-gradient(135deg,#8a5a36,#3ab0d8 60%,#f0d48a)',
+    space: 'linear-gradient(135deg,#0b0f33,#5b3cc0 60%,#ff4f8b)',
+    snowy: 'linear-gradient(135deg,#e8f6ff,#8bc8ff 60%,#4a6fa0)'
+  };
   UI.buildArenaRow = function () {
-    var row = $('arena-row');
-    var list = [
-      ['Bean Bowl Stadium', 'linear-gradient(135deg,#ff9a3a,#7a5cff 60%,#2f7bff)', true],
-      ['Rooftop Rumble', 'linear-gradient(135deg,#5bc8ff,#ffb86b 70%,#4a8f4a)', false],
-      ['Factory Floor', 'linear-gradient(135deg,#5a5f6e,#e0a13a 60%,#2d3140)', false],
-      ['Neon Dome', 'linear-gradient(135deg,#2a0f5e,#d23cff 60%,#2fd3ff)', false],
-      ['Pirate Pit', 'linear-gradient(135deg,#8a5a36,#3ab0d8 60%,#f0d48a)', false],
-      ['Space Court', 'linear-gradient(135deg,#0b0f33,#5b3cc0 60%,#ff4f8b)', false],
-      ['Snowy Summit', 'linear-gradient(135deg,#e8f6ff,#8bc8ff 60%,#4a6fa0)', false]
-    ];
+    var row = $('arena-row'), list = BBA.Arenas.list, cur = BBA.Settings.data.lastSetup.arena || 'bean_bowl';
     row.innerHTML = '';
-    for (var i = 0; i < list.length; i++) {
-      var t = el('div', 'atile' + (list[i][2] ? ' sel' : ' locked'), list[i][0] + (list[i][2] ? '<span class="chk">&#10003;</span>' : '<span class="soon">SOON</span>'));
-      t.style.background = list[i][1];
+    list.forEach(function (a) {
+      var t = el('button', 'atile' + (a.id === cur ? ' sel' : ''), UI.G.esc(a.name) + (a.id === cur ? '<span class="chk">&#10003;</span>' : ''));
+      t.style.background = ARENA_BG[a.id] || '#333';
+      t.title = a.blurb;
+      t.addEventListener('click', function () {
+        BBA.Settings.data.lastSetup.arena = a.id; BBA.Settings.save();
+        UI.G.menuArena = a.id;
+        if (UI.G.mode === 'attract') UI.G.startAttract();
+        UI.buildArenaRow();
+        BBA.Audio.play('ui');
+      });
       row.appendChild(t);
-    }
+    });
   };
 
   /* ---------------- screen stack ---------------- */
@@ -128,7 +153,7 @@
   UI.action = function (a) {
     var G = UI.G;
     switch (a) {
-      case 'quick': BBA.Audio.unlock(); UI.hideMenus(); G.startMatch({ teamSize: 3, duration: 240, difficulty: BBA.Settings.data.lastSetup.difficulty || 'normal', modifier: 'none' }); break;
+      case 'quick': BBA.Audio.unlock(); UI.hideMenus(); G.startMatch({ teamSize: 3, duration: 240, difficulty: BBA.Settings.data.lastSetup.difficulty || 'normal', modifier: 'none', arena: BBA.Settings.data.lastSetup.arena || 'bean_bowl', warmup: BBA.Settings.data.lastSetup.warmup }); break;
       case 'setup': UI.show('setup'); break;
       case 'create': $('online-title').textContent = 'CREATE PRIVATE MATCH'; BBA.Lobby.create(); break;
       case 'join': $('online-title').textContent = 'JOIN PRIVATE MATCH'; if (BBA.Net.available) UI.show('join'); else UI.show('online'); break;
@@ -138,7 +163,8 @@
       case 'back': UI.back(); break;
       case 'start': BBA.Settings.save(); UI.hideMenus(); G.startMatch(BBA.Settings.data.lastSetup); break;
       case 'resume': G.pause(false); break;
-      case 'restart': UI.hideMenus(); if (G.mode === 'tutorial') G.startTutorial(); else G.startMatch(G.setup); break;
+      case 'restart': UI.hideMenus(); if (G.mode === 'tutorial') G.startTutorial(); else if (G.freePractice) G.startPractice(); else G.startMatch(G.setup); break;
+      case 'practice': UI.hideMenus(); G.startPractice(); break;
       case 'help': UI.show('help'); break;
       case 'quit': UI.hideMenus(); if (G.mode === 'online') BBA.Lobby.leave(); else G.quitToMenu(); break;
       case 'again':
@@ -244,7 +270,8 @@
       for (var i = 0; i < colors.length; i++) {
         (function (c) {
           var s = el('div', 'sw' + (get() === c ? ' sel' : ''));
-          s.style.background = c;
+          s.style.background = c === 'team' ? 'linear-gradient(135deg,#2f7bff 50%,#ff3b4e 50%)' : c;
+          if (c === 'team') s.title = 'Team color';
           s.addEventListener('click', function (e) { e.stopPropagation(); set(c); render(); BBA.Audio.play('ui'); });
           box.appendChild(s);
         })(colors[i]);
@@ -261,10 +288,13 @@
     var S = BBA.Settings.data, L = S.lastSetup, box = $('setup-opts');
     box.innerHTML = '';
     function save() { BBA.Settings.save(); UI.teamsPreview(); }
-    box.appendChild(UI.choice('ARENA', [['bean_bowl', 'Bean Bowl Stadium']], function () { return 'bean_bowl'; }, function () {}, 'More arenas coming after this one is polished'));
+    box.appendChild(UI.choice('ARENA', BBA.Arenas.list.map(function (a) { return [a.id, a.name]; }), function () { return L.arena || 'bean_bowl'; },
+      function (v) { L.arena = v; save(); UI.G.menuArena = v; UI.buildArenaRow(); }, BBA.Arenas.list.filter(function (a) { return a.id === (L.arena || 'bean_bowl'); })[0].blurb));
     box.appendChild(UI.choice('TEAM SIZE', [[1, '1 v 1'], [2, '2 v 2'], [3, '3 v 3']], function () { return L.teamSize; }, function (v) { L.teamSize = v; save(); }));
     box.appendChild(UI.choice('MATCH LENGTH', [[180, '3 minutes'], [240, '4 minutes'], [300, '5 minutes']], function () { return L.duration; }, function (v) { L.duration = v; save(); }));
     box.appendChild(UI.choice('BOT DIFFICULTY', [['easy', 'Easy'], ['normal', 'Normal'], ['hard', 'Hard']], function () { return L.difficulty; }, function (v) { L.difficulty = v; save(); }));
+    box.appendChild(UI.choice('WARM-UP', [[0, 'Off'], [30, '30 seconds'], [45, '45 seconds'], [90, '90 seconds'], [-1, "Until I'm ready"]],
+      function () { return L.warmup === undefined ? 45 : L.warmup; }, function (v) { L.warmup = v; save(); }, 'Practice on the court before the match starts'));
     box.appendChild(UI.choice('MODIFIER', [['none', 'None (standard)'], ['superbounce', 'Super Bounce'], ['lowgravity', 'Low Gravity'], ['heavyball', 'Heavy Ball'], ['megaball', 'Mega Ball'], ['turbo', 'Turbo']],
       function () { return L.modifier || 'none'; }, function (v) { L.modifier = v; save(); }, 'Optional fun rules'));
     UI.teamsPreview();
@@ -283,6 +313,7 @@
   UI.buildCustomize = function () {
     var S = BBA.Settings.data, cos = S.cosmetics, COS = BBA.Character.COS, box = $('cust-opts'), G = UI.G;
     $('cust-name').value = S.name;
+    $('cust-jersey').value = cos.jerseyName || '';
     box.innerHTML = '';
     function upd() { BBA.Settings.save(); G.refreshPreview(); UI.refreshCard(); }
     function ch(label, key, list, extra) {
@@ -290,6 +321,7 @@
       box.appendChild(r);
     }
     box.appendChild(UI.swatches('BODY COLOR', COS.colors, function () { return cos.color; }, function (v) { cos.color = v; upd(); }));
+    box.appendChild(UI.swatches('JERSEY COLOR', ['team'].concat(COS.colors), function () { return cos.jerseyColor || 'team'; }, function (v) { cos.jerseyColor = v; upd(); }));
     ch('PATTERN', 'pattern', COS.patterns);
     box.appendChild(UI.swatches('PATTERN COLOR', COS.colors, function () { return cos.color2; }, function (v) { cos.color2 = v; upd(); }));
     ch('FACE', 'face', COS.faces);
@@ -308,7 +340,7 @@
     function pk(a) { return a[Math.floor(Math.random() * a.length)]; }
     cos.color = pk(COS.colors); cos.color2 = pk(COS.colors); cos.pattern = pk(COS.patterns)[0]; cos.face = pk(COS.faces)[0];
     cos.hat = pk(COS.hats)[0]; cos.upper = pk(COS.uppers)[0]; cos.lower = pk(COS.lowers)[0];
-    cos.celebration = pk(COS.celebrations)[0]; cos.victory = pk(COS.victories)[0]; cos.number = Math.floor(Math.random() * 100);
+    cos.celebration = pk(COS.celebrations)[0]; cos.jerseyColor = Math.random() < 0.5 ? 'team' : pk(COS.colors); cos.victory = pk(COS.victories)[0]; cos.number = Math.floor(Math.random() * 100);
     BBA.Settings.save();
     UI.buildCustomize(); UI.refreshCard();
   };
@@ -522,7 +554,7 @@
     if (s0.textContent !== String(m.score[0])) s0.textContent = m.score[0];
     if (s1.textContent !== String(m.score[1])) s1.textContent = m.score[1];
     var clockEl = $('sb-clock');
-    var ctext = sim.mode !== 'match' ? 'PRACTICE' : (m.phase === 'countdown' ? fmtClock(m.clock) : fmtClock(m.clock));
+    var ctext = sim.mode !== 'match' ? 'PRACTICE' : (m.phase === 'warmup' ? 'WARM-UP' : fmtClock(m.clock));
     if (m.overtime) ctext = 'OT';
     if (clockEl.textContent !== ctext) clockEl.textContent = ctext;
     var cbox = clockEl.parentNode;
@@ -531,6 +563,29 @@
     var holderTeam = b.holder >= 0 ? sim.players[b.holder].team : -1;
     $('sb-p0').classList.toggle('on', holderTeam === 0);
     $('sb-p1').classList.toggle('on', holderTeam === 1);
+
+    // warm-up / practice panel
+    var wb = $('warmup-box');
+    if (m.phase === 'warmup') {
+      wb.classList.remove('hidden');
+      var free = G.freePractice || sim.mode === 'practice';
+      $('wu-title').textContent = free ? 'PRACTICE' : 'WARM-UP';
+      var sub = free ? 'Free play · scores don\'t count' : "Scores don't count";
+      if (!free && isFinite(sim.warmup)) {
+        var left = Math.max(0, sim.warmup - m.phaseT);
+        sub = 'Match in ' + Math.floor(left / 60) + ':' + ('0' + Math.floor(left % 60)).slice(-2) + ' · ' + sub;
+      }
+      var mine, cnt;
+      if (G.mode === 'online') { mine = G.net.myReady; cnt = G.net.wr; }
+      else { mine = !!sim.warmupReady[G.localId]; cnt = null; }
+      if (cnt && cnt[1] > 1) sub += ' · ready ' + cnt[0] + '/' + cnt[1];
+      $('wu-sub').textContent = sub;
+      var rb = $('wu-ready');
+      rb.style.display = free ? 'none' : '';
+      var lbl = mine ? 'READY ✓' : "I'M READY" + (BBA.Controls.device === 'touch' ? '' : ' (' + (BBA.Controls.device === 'pad' ? BBA.Controls.padButtonName(BBA.Settings.data.pad.ready) : 'Enter') + ')');
+      if (rb.textContent !== lbl) rb.textContent = lbl;
+      rb.classList.toggle('on', !!mine);
+    } else wb.classList.add('hidden');
 
     // charge ring
     var ch = $('charge');
@@ -564,6 +619,7 @@
       txt = key('dive') + ' dive to tackle · ' + key('grab') + ' hold to steal';
     }
     if (m.phase === 'countdown') txt = 'Get ready to jump down!';
+    if (m.phase === 'warmup' && !txt) txt = UI.hintT < 12 ? 'Grab the ball and practice shots and dunks' : '';
     if (pr._t !== txt) { pr.innerHTML = txt; pr._t = txt; }
     pr.className = cls;
     // touch button highlights
@@ -609,12 +665,13 @@
     function Z(z) { return H / 2 + z * sz * flip; }
     c.clearRect(0, 0, W, H);
     c.fillStyle = 'rgba(255,170,90,0.25)'; c.fillRect(X(A.halfW), Z(-A.halfL) < Z(A.halfL) ? Z(-A.halfL) : Z(A.halfL), A.halfW * 2 * sx, A.halfL * 2 * sz);
+    var i;
+    function rect(b) { var x0 = X(b.x0), x1 = X(b.x1), z0 = Z(b.z0), z1 = Z(b.z1); c.fillRect(Math.min(x0, x1), Math.min(z0, z1), Math.abs(x1 - x0), Math.abs(z1 - z0)); }
+    c.fillStyle = 'rgba(20,20,40,0.85)'; A.pits.forEach(rect);
+    c.fillStyle = 'rgba(160,220,255,0.35)'; A.ice.forEach(rect);
     c.fillStyle = 'rgba(140,108,255,0.55)';
-    var P = A.PLAT, i;
-    for (var s1 = -1; s1 <= 1; s1 += 2) for (var s2 = -1; s2 <= 1; s2 += 2) {
-      var x0 = X(s1 * P.xIn), x1 = X(s1 * P.xOut), z0 = Z(s2 * P.zRamp), z1 = Z(s2 * P.zEnd);
-      c.fillRect(Math.min(x0, x1), Math.min(z0, z1), Math.abs(x1 - x0), Math.abs(z1 - z0));
-    }
+    A.blocks.forEach(function (b) { if (b.tag !== 'tower' && b.tag !== 'rail') rect(b); });
+    c.fillStyle = 'rgba(140,108,255,0.35)'; A.ramps.forEach(rect);
     for (i = 0; i < 2; i++) {
       var h = sim.hoops[i];
       c.strokeStyle = teamCss[i]; c.lineWidth = 3;
@@ -640,7 +697,8 @@
   };
 
   /* ---------------- results ---------------- */
-  UI.showResults = function (sim, localId, teamCss) {
+  UI.showResults = function (sim, localId, teamCss, podium) {
+    $('scr-results').classList.toggle('podium', !!podium);
     var m = sim.match, lp = sim.players[localId];
     var title = m.winner < 0 ? 'DRAW!' : (C.TEAM_NAMES[m.winner] + ' WINS!');
     var won = m.winner === lp.team;

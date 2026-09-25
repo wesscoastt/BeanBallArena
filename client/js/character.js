@@ -50,22 +50,40 @@
     g.closePath(); g.fill();
   }
 
-  function jerseyTexture(teamColor, number, hood) {
+  function cleanJerseyName(n) {
+    return String(n || '').toUpperCase().replace(/[^A-Z0-9 .'\-]/g, '').trim().slice(0, 10);
+  }
+
+  function jerseyTexture(teamColor, number, name, baseColor) {
     var cv = makeCanvas(512, 128), g = cv.getContext('2d');
-    g.fillStyle = teamColor; g.fillRect(0, 0, 512, 128);
-    g.fillStyle = 'rgba(255,255,255,0.95)';
-    g.fillRect(0, 6, 512, 8); g.fillRect(0, 114, 512, 8);
+    var custom = baseColor && baseColor !== 'team';
+    g.fillStyle = custom ? baseColor : teamColor; g.fillRect(0, 0, 512, 128);
+    // custom jerseys keep thick team-colored trim so teams stay readable
+    g.fillStyle = custom ? teamColor : 'rgba(255,255,255,0.95)';
+    if (custom) { g.fillRect(0, 0, 512, 18); g.fillRect(0, 110, 512, 18); g.fillStyle = 'rgba(255,255,255,0.9)'; g.fillRect(0, 18, 512, 4); g.fillRect(0, 106, 512, 4); }
+    else { g.fillRect(0, 6, 512, 8); g.fillRect(0, 114, 512, 8); }
     g.fillStyle = 'rgba(0,0,0,0.18)'; g.fillRect(0, 0, 512, 5);
     var num = (number < 10 ? '0' : '') + number;
-    g.font = 'bold 72px Arial Black, Arial, sans-serif';
     g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.lineWidth = 8; g.strokeStyle = 'rgba(0,0,0,0.25)';
-    // front (u=0.5 with thetaStart = PI) : emblem ; back (u=0 / 1): number
+    g.strokeStyle = 'rgba(0,0,0,0.3)';
     g.fillStyle = '#ffffff';
-    // front crown emblem
+    // front (u=0.5 with thetaStart = PI): crown emblem
     drawCrown(g, 256, 66, 40);
-    g.strokeText(num, 0, 68); g.fillText(num, 0, 68);
-    g.strokeText(num, 512, 68); g.fillText(num, 512, 68);
+    // back (u=0 / 1, drawn on both edges so it wraps across the seam): name + number
+    var nm = cleanJerseyName(name);
+    var numY = nm ? 80 : 68;
+    g.font = 'bold ' + (nm ? 58 : 72) + 'px Arial Black, Arial, sans-serif';
+    g.lineWidth = 8;
+    g.strokeText(num, 0, numY); g.fillText(num, 0, numY);
+    g.strokeText(num, 512, numY); g.fillText(num, 512, numY);
+    if (nm) {
+      var fs = 30;
+      g.font = 'bold ' + fs + 'px Arial Black, Arial, sans-serif';
+      while (g.measureText(nm).width > 170 && fs > 16) { fs -= 2; g.font = 'bold ' + fs + 'px Arial Black, Arial, sans-serif'; }
+      g.lineWidth = 5;
+      g.strokeText(nm, 0, 34); g.fillText(nm, 0, 34);
+      g.strokeText(nm, 512, 34); g.fillText(nm, 512, 34);
+    }
     var t = new THREE.CanvasTexture(cv);
     return t;
   }
@@ -158,13 +176,15 @@
       sash.rotation.x = Math.PI / 2; sash.rotation.y = 0.3; sash.position.y = 0.9;
       bodyG.add(sash);
     } else {
-      var jt = jerseyTexture(team, opts.number || cos.number || 7);
+      var jn = opts.number !== undefined && opts.number !== null ? opts.number : (cos.number !== undefined ? cos.number : 7);
+      var jc = cos.jerseyColor && cos.jerseyColor !== 'team' ? cos.jerseyColor : null;
+      var jt = jerseyTexture(team, jn, opts.jerseyName !== undefined ? opts.jerseyName : (cos.jerseyName || ''), jc);
       var jersey = new THREE.Mesh(new THREE.CylinderGeometry(0.59, 0.6, 0.55, 22, 1, true, Math.PI, Math.PI * 2),
         new THREE.MeshStandardMaterial({ map: jt, roughness: 0.7, side: THREE.DoubleSide }));
       jersey.position.y = 0.86;
       bodyG.add(jersey);
       // sleeves
-      var slv = mat(team);
+      var slv = mat(jc || team);
       var s1 = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.12, 8), slv); s1.position.y = -0.05; ch.armL.add(s1);
       var s2 = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.12, 8), slv); s2.position.y = -0.05; ch.armR.add(s2);
       if (upper === 'hoodie') {
@@ -341,5 +361,5 @@
     });
   }
 
-  BBA.Character = { build: build, dispose: dispose, COS: COS, jerseyTexture: jerseyTexture, drawCrown: drawCrown, star: star };
+  BBA.Character = { build: build, dispose: dispose, COS: COS, jerseyTexture: jerseyTexture, cleanJerseyName: cleanJerseyName, drawCrown: drawCrown, star: star };
 })(this);

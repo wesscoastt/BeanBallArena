@@ -54,6 +54,13 @@ This is a 3v3 party-sports game that runs in the browser, built with Three.js r1
   - Settings: graphics, audio, controls, mobile, accessibility (colorblind team colors, screen shake, reduced motion, UI scale, sound captions).
   - A 10-step interactive tutorial, a pause menu, and a results screen with MVP and stats.
 
+## New in 0.3
+- **Warm-up before every match**, like the Crown Jam pre-game. Everyone runs around the court with the ball and practice baskets don't count. Press **I'M READY** (Enter, the View button on a controller, or tap it) to start. Online, the match starts once everyone is ready or the timer runs out. Warm-up length can be set in Play vs Bots and in the host's lobby settings.
+- **PRACTICE** (main menu): free play with just you and the ball, no clock.
+- **Winners' podium** after each match. The winning team stands on 1st, 2nd and 3rd, ranked by points, and loops their celebration emote. The MVP gets a floating crown, there's confetti, and the results show underneath.
+- **Custom jersey names**: set yours in Customize and it's printed above your number on your back. Bots wear their own names.
+- **Fixed:** a black screen at the start of a match played after a previous match. The end-of-match camera left bad values behind. Also added recovery if a phone drops the graphics context.
+
 ## Online multiplayer (milestone 2)
 - One Node.js + Socket.IO server that serves the game and runs matches.
 - Private rooms with 5-character codes and a copyable invite link (`?room=CODE` joins automatically).

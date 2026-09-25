@@ -33,7 +33,7 @@ function Match(room, io) {
   });
   this.seed = (Math.random() * 1e9) | 0;
   this.sim = new Sim({
-    roster: roster, mode: 'match', seed: this.seed, countdown: 4,
+    roster: roster, mode: 'match', seed: this.seed, countdown: 4, warmup: s.warmup < 0 ? 180 : (s.warmup || 0),
     settings: {
       duration: s.duration, scoreLimit: s.scoreLimit, overtime: s.overtime, difficulty: s.difficulty, teamSize: s.teamSize,
       tackleStrength: s.tackleStrength, ballWeight: s.ballWeight, gravity: s.gravity, jumpHeight: s.jumpHeight,
@@ -61,12 +61,12 @@ function Match(room, io) {
 Match.prototype.startInfo = function (token) {
   var sim = this.sim, pid = this.owners.indexOf(token);
   return {
-    seed: this.seed, settings: sim.settings,
+    seed: this.seed, settings: sim.settings, warmup: sim.warmup,
     roster: sim.players.map(function (p) { return { team: p.team, name: p.name, isBot: p.isBot }; }),
     humans: this.owners.map(function (o) { return !!o; }),
     cosmetics: this.cosmetics,
     you: pid,
-    snapshot: Protocol.encodeSnapshot(sim, { acks: this.acks() })
+    snapshot: Protocol.encodeSnapshot(sim, { acks: this.acks(), wr: this.readyInfo() })
   };
 };
 
@@ -80,6 +80,7 @@ Match.prototype.setAway = function (pid, away) {
 /* Convert a human slot into a permanent bot (reconnect window expired). */
 Match.prototype.convertToBot = function (pid) {
   this.owners[pid] = null;
+  delete this.sim.warmupReady[pid];
   delete this.inputs[pid];
   if (!this.ai.isBot(pid)) this.ai.addBot(pid, this.room.settings.difficulty);
   this.sim.players[pid].isBot = true;
@@ -144,8 +145,13 @@ Match.prototype.tick = function () {
   }
 };
 
+Match.prototype.readyInfo = function () {
+  var c = this.sim.warmupReadyCount();
+  return [c.ready, c.humans];
+};
+
 Match.prototype.broadcast = function () {
-  var snap = Protocol.encodeSnapshot(this.sim, { acks: this.acks(), ev: this.pendingEvents });
+  var snap = Protocol.encodeSnapshot(this.sim, { acks: this.acks(), ev: this.pendingEvents, wr: this.readyInfo() });
   this.pendingEvents = [];
   this.io.to(this.room.channel()).emit(Protocol.EV.snapshot, snap);
 };
