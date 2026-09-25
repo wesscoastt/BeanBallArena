@@ -1,0 +1,19 @@
+{
+  "name": "bean-ball-arena-server",
+  "version": "0.2.0",
+  "description": "Authoritative Node.js + Socket.IO game server for Bean Ball Arena (serves the client too).",
+  "main": "server.js",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "socket.io": "^4.7.5"
+  },
+  "devDependencies": {
+    "socket.io-client": "^4.7.5"
+  }
+}

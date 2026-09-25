@@ -1,0 +1,13 @@
+{
+  "name": "bean-ball-arena",
+  "version": "0.2.0",
+  "private": true,
+  "description": "3v3 party-sports browser game with bots and online private rooms.",
+  "scripts": {
+    "start": "node server/server.js",
+    "build": "node tools/build.js",
+    "test": "node tests/mechanics.js && node tests/harness.js 3 normal 3"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": { "socket.io": "^4.7.5" }
+}

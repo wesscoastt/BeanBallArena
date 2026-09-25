@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1b1f5a">
+<title>Bean Ball Arena</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@700;800;900&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body class="in-menu">
+<canvas id="game"></canvas>
+
+<!-- ============ HUD ============ -->
+<div id="hud" class="hidden">
+  <div id="tags"></div>
+  <div id="scorebar">
+    <div class="sb-team sb-blue"><span class="sb-arrow">&#187;</span><span class="sb-name">BLUE</span><span class="sb-score" id="sb-s0">0</span><span class="sb-pos" id="sb-p0"></span></div>
+    <div class="sb-clock"><span id="sb-clock">4:00</span><span id="sb-ot">OVERTIME</span></div>
+    <div class="sb-team sb-red"><span class="sb-pos" id="sb-p1"></span><span class="sb-score" id="sb-s1">0</span><span class="sb-name">RED</span></div>
+  </div>
+  <div id="bigtick"></div>
+  <div id="banner"><div class="b-title"></div><div class="b-sub"></div></div>
+  <div id="toast"></div>
+  <div id="feed"></div>
+  <canvas id="radar" width="120" height="196"></canvas>
+  <div id="ballarrow"><div class="ba-arrow"></div><div class="ba-ball"></div></div>
+  <div id="crosshair"></div>
+  <div id="charge"><svg viewBox="0 0 100 100"><circle class="c-bg" cx="50" cy="50" r="42"/><circle class="c-fg" id="charge-fg" cx="50" cy="50" r="42"/></svg><span id="charge-txt">SHOOT</span></div>
+  <div id="prompt"></div>
+  <div id="hints"></div>
+  <div id="tutorial-box" class="hidden"><div class="tut-step" id="tut-step"></div><div class="tut-text" id="tut-text"></div><div class="tut-sub" id="tut-sub"></div><button class="tut-skip" id="tut-skip">Skip tutorial</button></div>
+  <button id="pause-btn" class="hidden" aria-label="Pause">II</button>
+  <div id="netinfo"></div>
+</div>
+<div id="captions"></div>
+<div id="touch-ui"></div>
+
+<!-- ============ MENUS ============ -->
+<div id="menus">
+
+  <!-- MAIN -->
+  <section class="screen" id="scr-main">
+    <div class="main-left">
+      <div class="logo"><div class="logo-crown">&#9819;</div><div class="logo-top"><span class="l-bean">BEAN</span> <span class="l-ball">BALL</span></div><div class="logo-bot">ARENA</div></div>
+      <nav class="main-nav">
+        <button class="mbtn mbtn-play" data-act="quick"><span class="ico">&#9654;</span>PLAY</button>
+        <button class="mbtn" data-act="setup"><span class="ico">&#129302;</span>PLAY VS BOTS</button>
+        <button class="mbtn" data-act="create"><span class="ico">&#128101;</span>CREATE PRIVATE MATCH</button>
+        <button class="mbtn" data-act="join"><span class="ico">&#10132;</span>JOIN PRIVATE MATCH</button>
+        <button class="mbtn" data-act="customize"><span class="ico">&#128085;</span>CUSTOMIZE</button>
+        <button class="mbtn" data-act="settings"><span class="ico">&#9881;</span>SETTINGS</button>
+      </nav>
+    </div>
+    <div class="main-right">
+      <div class="pcard"><div class="pc-avatar" id="pc-avatar"></div><div class="pc-info"><div class="pc-name" id="pc-name">Wesley</div><div class="pc-sub">Ready to play</div></div></div>
+      <div class="welcome">
+        <div class="w-title">WELCOME TO BEAN BALL ARENA!</div>
+        <div class="w-body">3v3 party hoops. Drop from your team deck, grab the ball, pass, dunk, and don't get tackled.</div>
+        <div class="w-keys" id="w-keys"></div>
+      </div>
+    </div>
+    <div class="arenas">
+      <div class="arenas-title">FEATURED ARENAS</div>
+      <div class="arena-row" id="arena-row"></div>
+    </div>
+    <button class="tut-btn" data-act="tutorial">&#127891; TUTORIAL</button>
+    <div class="version" id="version"></div>
+  </section>
+
+  <!-- SETUP (play vs bots) -->
+  <section class="screen panel-screen" id="scr-setup">
+    <div class="panel">
+      <h2>PLAY VS BOTS</h2>
+      <div class="opt-list" id="setup-opts"></div>
+      <div class="teams-preview" id="teams-preview"></div>
+      <div class="panel-actions">
+        <button class="pbtn back" data-act="back">BACK</button>
+        <button class="pbtn go" data-act="start">START MATCH</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ONLINE (no server available) -->
+  <section class="screen panel-screen" id="scr-online">
+    <div class="panel">
+      <h2 id="online-title">PRIVATE MATCH</h2>
+      <div class="online-body">
+        <p><b>Online play needs the Bean Ball game server.</b></p>
+        <p>This copy of the game is running on its own (for example inside Claude or on GitHub Pages), so it can't reach the server. Open the game from your server's web address instead (see <b>server/README</b> in the project for the 5-minute Render setup). Everyone who opens that address can create or join rooms.</p>
+        <p class="dim">You can still play against bots right here.</p>
+      </div>
+      <div class="panel-actions">
+        <button class="pbtn back" data-act="back">BACK</button>
+        <button class="pbtn go" data-act="setup">PLAY VS BOTS</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- JOIN BY CODE -->
+  <section class="screen panel-screen" id="scr-join">
+    <div class="panel narrow">
+      <h2>JOIN PRIVATE MATCH</h2>
+      <p class="center">Enter the room code your friend sent you.</p>
+      <input id="join-code" class="code-input" maxlength="5" placeholder="K7P4Q" autocomplete="off" autocapitalize="characters" spellcheck="false">
+      <div class="lobby-status" id="join-status"></div>
+      <div class="panel-actions">
+        <button class="pbtn back" data-act="back">BACK</button>
+        <button class="pbtn go" id="join-go">JOIN</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- LOBBY -->
+  <section class="screen panel-screen" id="scr-lobby">
+    <div class="panel wide lobby">
+      <div class="lobby-head">
+        <div><div class="lh-label">ROOM CODE</div><div class="lobby-code" id="lobby-code">-----</div></div>
+        <div class="lh-share"><button class="pbtn small" id="lobby-copy">COPY INVITE LINK</button><div class="lobby-link" id="lobby-link"></div></div>
+      </div>
+      <div class="lobby-summary" id="lobby-summary"></div>
+      <div class="teams-preview" id="lobby-teams"></div>
+      <div class="opt-list scroll" id="lobby-settings" style="display:none"></div>
+      <div class="lobby-status" id="lobby-status"></div>
+      <div class="panel-actions wrap">
+        <button class="pbtn back" data-act="lobby-leave">LEAVE</button>
+        <button class="pbtn" data-act="lobby-switch">SWITCH TEAM</button>
+        <button class="pbtn" data-act="lobby-settings" id="lobby-settings-btn">MATCH SETTINGS</button>
+        <button class="pbtn go" data-act="lobby-ready" id="lobby-ready">READY</button>
+        <button class="pbtn go" data-act="lobby-start" id="lobby-start">START MATCH</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- CUSTOMIZE -->
+  <section class="screen" id="scr-customize">
+    <div class="cust-panel">
+      <h2>CUSTOMIZE</h2>
+      <label class="name-row">NAME <input id="cust-name" maxlength="14" autocomplete="off" spellcheck="false"></label>
+      <div class="opt-list" id="cust-opts"></div>
+      <div class="panel-actions">
+        <button class="pbtn" data-act="randomize">RANDOMIZE</button>
+        <button class="pbtn go" data-act="back">DONE</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section class="screen panel-screen" id="scr-settings">
+    <div class="panel wide">
+      <h2>SETTINGS</h2>
+      <div class="tabs" id="set-tabs"></div>
+      <div class="opt-list scroll" id="set-opts"></div>
+      <div class="panel-actions">
+        <button class="pbtn" data-act="restore">RESTORE DEFAULTS</button>
+        <button class="pbtn go" data-act="back">DONE</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- PAUSE -->
+  <section class="screen panel-screen" id="scr-pause">
+    <div class="panel narrow">
+      <h2>PAUSED</h2>
+      <div class="vlist">
+        <button class="pbtn go" data-act="resume">RESUME</button>
+        <button class="pbtn" data-act="restart" id="pause-restart">RESTART MATCH</button>
+        <button class="pbtn" data-act="help">CONTROLS</button>
+        <button class="pbtn" data-act="settings">SETTINGS</button>
+        <button class="pbtn back" data-act="quit">QUIT TO MENU</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- HELP -->
+  <section class="screen panel-screen" id="scr-help">
+    <div class="panel wide">
+      <h2>CONTROLS</h2>
+      <div class="help-grid" id="help-grid"></div>
+      <div class="panel-actions"><button class="pbtn go" data-act="back">BACK</button></div>
+    </div>
+  </section>
+
+  <!-- RESULTS -->
+  <section class="screen panel-screen" id="scr-results">
+    <div class="panel wide results">
+      <h2 id="res-title">BLUE WINS!</h2>
+      <div class="res-score" id="res-score"></div>
+      <div class="res-mvp" id="res-mvp"></div>
+      <div class="res-table" id="res-table"></div>
+      <div class="panel-actions">
+        <button class="pbtn back" data-act="quit" id="res-quit">MAIN MENU</button>
+        <button class="pbtn go" data-act="again" id="res-again">PLAY AGAIN</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- TUTORIAL DONE -->
+  <section class="screen panel-screen" id="scr-tutdone">
+    <div class="panel narrow">
+      <h2>YOU'RE READY!</h2>
+      <p class="center">You've got the basics: move, sprint, jump, dive, grab, pass, tackle, shoot and dunk.</p>
+      <div class="vlist">
+        <button class="pbtn go" data-act="setup">PLAY VS BOTS</button>
+        <button class="pbtn back" data-act="quit">MAIN MENU</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div id="edit-bar" class="hidden"><span>Drag buttons to move them</span><button id="edit-done" class="pbtn go">DONE</button></div>
+<div id="fatal" class="hidden"></div>
+<div id="loading">LOADING…</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="../shared/constants.js"></script>
+<script src="../shared/gameRules.js"></script>
+<script src="../shared/arenaDef.js"></script>
+<script src="../shared/sim.js"></script>
+<script src="../shared/ai.js"></script>
+<script src="../shared/protocol.js"></script>
+<script src="js/settings.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/controls.js"></script>
+<script src="js/meshutil.js"></script>
+<script src="js/character.js"></script>
+<script src="js/animations.js"></script>
+<script src="js/arena.js"></script>
+<script src="js/ball.js"></script>
+<script src="js/effects.js"></script>
+<script src="js/camera.js"></script>
+<script src="js/player.js"></script>
+<script src="js/tutorial.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/network.js"></script>
+<script src="js/lobby.js"></script>
+<script src="js/game.js"></script>
+<script>
+  (function () {
+    var l = document.getElementById('loading');
+    if (!window.THREE) { l.textContent = 'Could not load Three.js - check your connection and reload.'; return; }
+    try { BBA.Game.init(); l.style.display = 'none'; }
+    catch (e) { l.textContent = 'Error starting game: ' + e.message; throw e; }
+  })();
+</script>
+</body>
+</html>
