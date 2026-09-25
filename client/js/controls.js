@@ -56,13 +56,13 @@
       if (bound('pause', e.code) && C.onPause) C.onPause();
       if (bound('ready', e.code) && !e.repeat) C.readyQueued = true; // never miss a quick tap between frames
       // menu nav via keyboard arrows is handled by the browser focus; we also map for consistency
-      if (C.onNav && !C.gameActive) {
+      if (C.onNav && C.menuActive()) {
         if (e.code === 'ArrowUp') { C.onNav('up'); e.preventDefault(); }
         else if (e.code === 'ArrowDown') { C.onNav('down'); e.preventDefault(); }
         else if (e.code === 'ArrowLeft') { C.onNav('left'); }
         else if (e.code === 'ArrowRight') { C.onNav('right'); }
       }
-      if (C.gameActive && (e.code === 'Space' || e.code.indexOf('Arrow') === 0 || e.code === 'Tab')) e.preventDefault();
+      if (C.gameActive && !C.menuActive() && (e.code === 'Space' || e.code.indexOf('Arrow') === 0 || e.code === 'Tab')) e.preventDefault();
     });
     root.addEventListener('keyup', function (e) { C.keys[e.code] = false; });
     root.addEventListener('blur', function () { C.keys = {}; });
@@ -89,6 +89,10 @@
     });
     C.buildTouch();
   };
+
+  // Menus take controller/arrow input whenever one is on screen (main menu,
+  // pause, results, lobby...), even while a match is loaded underneath.
+  C.menuActive = function () { return !C.gameActive || !!(BBA.UI && BBA.UI.current); };
 
   C.requestLock = function () {
     if (!C.canvas || !C.canvas.requestPointerLock || BBA.Settings.isMobile) return;
@@ -173,7 +177,7 @@
     }
 
     // menu nav
-    if (!C.gameActive && C.onNav) {
+    if (C.onNav && C.menuActive()) {
       var dir = '';
       if (pressedNow[12] || ls[1] < -0.6) dir = 'up';
       else if (pressedNow[13] || ls[1] > 0.6) dir = 'down';
@@ -188,8 +192,19 @@
       if (pressedNow[1] && !C.padPrev[1]) C.onNav('back');
     }
     if (pressedNow[map.pause] && !C.padPrev[map.pause] && C.onPause) C.onPause();
+    // Buttons pressed while a menu was open (e.g. A on RESUME) stay ignored in
+    // gameplay until released, so they don't turn into a jump or a shot.
+    var inMenu = C.onNav && C.menuActive();
+    C.padMask = C.padMask || [];
+    for (i = 0; i < pressedNow.length; i++) {
+      if (!pressedNow[i]) C.padMask[i] = false;
+      else if (inMenu) C.padMask[i] = true;
+    }
+    var pressedGame = [];
+    for (i = 0; i < pressedNow.length; i++) pressedGame.push(pressedNow[i] && !C.padMask[i]);
 
     if (C.device === 'pad') {
+      var pressedNow0 = pressedNow; pressedNow = pressedGame;
       st.mx = ls[0]; st.my = -ls[1];
       var sens = S.padSens * 3.2 * dt;
       st.lookX += rs[0] * sens;
@@ -204,6 +219,7 @@
       h.aim = h.aim || pressedNow[map.aim];
       h.grab = h.grab || pressedNow[map.grab];
       h.ready = h.ready || pressedNow[map.ready === undefined ? 8 : map.ready];
+      pressedNow = pressedNow0;
     }
     C.padPrev = pressedNow;
   };
