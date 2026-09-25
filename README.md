@@ -54,6 +54,10 @@ This is a 3v3 party-sports game that runs in the browser, built with Three.js r1
   - Settings: graphics, audio, controls, mobile, accessibility (colorblind team colors, screen shake, reduced motion, UI scale, sound captions).
   - A 10-step interactive tutorial, a pause menu, and a results screen with MVP and stats.
 
+## New in 0.4
+- **7 arenas:** Bean Bowl Stadium, Rooftop Rumble (roof gaps and raised side paths), Factory Floor (conveyor belts), Neon Dome (bouncy walls and light bridges), Pirate Pit (water channels, bridges and swinging cannonballs), Space Court (low gravity, floating platforms, void holes) and Snowy Summit (icy midfield). Pick a map from the main menu tiles, in Play vs Bots, or from the host's lobby settings.
+- **Jersey color:** set it in Customize. Custom jerseys keep team-colored trim so teams stay readable.
+
 ## New in 0.3
 - **Warm-up before every match**, like the Crown Jam pre-game. Everyone runs around the court with the ball and practice baskets don't count. Press **I'M READY** (Enter, the View button on a controller, or tap it) to start. Online, the match starts once everyone is ready or the timer runs out. Warm-up length can be set in Play vs Bots and in the host's lobby settings.
 - **PRACTICE** (main menu): free play with just you and the ball, no clock.
