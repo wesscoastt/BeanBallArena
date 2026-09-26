@@ -46,9 +46,12 @@
       G.applyGraphics();
     }, false);
     renderer.shadowMap.enabled = !!S.shadows;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // PCF (not PCFSoft): far fewer shadow-map samples per pixel for nearly the same look
+    renderer.shadowMap.type = THREE.PCFShadowMap;
     G.scene = new THREE.Scene();
-    G.camera = new THREE.PerspectiveCamera(64, 1, 0.1, 900);
+    // near plane 0.3 (the camera never gets closer than ~1.4 to anything): 3x the depth
+    // precision of 0.1, which keeps far scenery like the snow mountains from flickering
+    G.camera = new THREE.PerspectiveCamera(64, 1, 0.3, 900);
     G.rig = new BBA.CameraRig(G.camera);
     G.teamCss = BBA.Settings.teamColors();
     G.arena = new BBA.ArenaView(G.scene, { arena: BBA.Arenas.get('bean_bowl'), teamCss: G.teamCss, mobile: BBA.Settings.isMobile });
@@ -80,13 +83,42 @@
 
   G.applyGraphics = function () {
     var S = BBA.Settings.data;
-    var dpr = Math.min(root.devicePixelRatio || 1, BBA.Settings.isMobile ? 2 : 2);
-    G.renderer.setPixelRatio(dpr * S.renderScale);
+    G._applyPixelRatio();
     if (G.renderer.shadowMap.enabled !== !!S.shadows) {
       G.renderer.shadowMap.enabled = !!S.shadows;
       G.scene.traverse(function (o) { if (o.material) { var m = Array.isArray(o.material) ? o.material : [o.material]; for (var i = 0; i < m.length; i++) m[i].needsUpdate = true; } });
     }
     G.resize();
+  };
+
+  /* Render resolution = device pixel ratio x the player's render scale x the automatic
+   * scale (dynScale), which drops when frames run slow and recovers when there's headroom. */
+  G.dynScale = 1;
+  G._applyPixelRatio = function () {
+    var S = BBA.Settings.data;
+    var dpr = Math.min(root.devicePixelRatio || 1, 2);
+    G.renderer.setPixelRatio(dpr * S.renderScale * (S.autoRes ? G.dynScale : 1));
+  };
+
+  G._autoRes = function (dt) {
+    var S = BBA.Settings.data, A = G._ar || (G._ar = { t: 0, n: 0, sum: 0, good: 0, freeze: 0, lastAvg: 0, dropped: false });
+    if (!S.autoRes || G.paused || !G.sim || G.mode === 'attract' || BBA.UI.current) { A.t = 0; A.n = 0; A.sum = 0; return; }
+    A.t += dt; A.n++; A.sum += dt;
+    if (A.freeze > 0) A.freeze -= dt;
+    if (A.t < 1) return;
+    var avg = A.sum / A.n, target = S.fpsLimit > 0 ? 1 / S.fpsLimit : 1 / 60;
+    A.t = 0; A.n = 0; A.sum = 0;
+    // a drop that didn't help means we're not pixel-bound (or the screen is capped at 30 Hz): undo it and wait
+    if (A.dropped && avg > A.lastAvg * 0.96) { G.dynScale = Math.min(1, G.dynScale / 0.88); A.freeze = 12; A.dropped = false; A.lastAvg = avg; G._applyPixelRatio(); G.resize(); return; }
+    A.dropped = false;
+    if (avg > target * 1.25 && G.dynScale > 0.55 && A.freeze <= 0) {
+      G.dynScale = Math.max(0.55, G.dynScale * 0.88); A.dropped = true; A.good = 0;
+    } else if (avg < target * 1.08 && G.dynScale < 1) {
+      if (++A.good < 3) { A.lastAvg = avg; return; }
+      G.dynScale = Math.min(1, G.dynScale * 1.06); A.good = 0;
+    } else { A.good = 0; A.lastAvg = avg; return; }
+    A.lastAvg = avg;
+    G._applyPixelRatio(); G.resize();
   };
 
   G.resize = function () {
@@ -466,6 +498,7 @@
     }
     var alpha = clamp(G.acc / TICK, 0, 1);
     G._render(dt, alpha, ctl);
+    G._autoRes(dt);
   };
 
   G._step = function (ctl) {

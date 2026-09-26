@@ -16,6 +16,7 @@
     effects: true,
     antialias: !isMobile,
     fpsLimit: 0,           // 0 = unlimited (display rate), 30, 60
+    autoRes: true,         // lower the resolution automatically when frames run slow
     // audio
     master: 0.8, music: 0.55, sfx: 0.9, crowd: 0.6,
     // controls

@@ -350,6 +350,7 @@
     if (BBA.MeshUtil) {
       BBA.MeshUtil.mergeMeshes(bodyG);
       BBA.MeshUtil.mergeMeshes(ch.armL); BBA.MeshUtil.mergeMeshes(ch.armR);
+      BBA.MeshUtil.mergeMeshes(ch.legL); BBA.MeshUtil.mergeMeshes(ch.legR);
     }
     ch.root = rootG; ch.pivot = pivot; ch.body = bodyG; ch.face = faceG;
     ch.anim = BBA.Anim ? BBA.Anim.create() : null;

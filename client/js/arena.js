@@ -362,7 +362,7 @@
     // bounce-wall glow strips
     if (A.bounceWalls) {
       var nm = new THREE.MeshBasicMaterial({ color: TH.grid || '#45e8ff' });
-      this.neonWall = nm;
+      nm.userData.animated = true; this.neonWall = nm;
       for (var e = -1; e <= 1; e += 2) {
         g.add(box(0.15, 0.15, A.halfL * 2, nm, e * (A.halfW + 0.05), 1.4, 0));
         g.add(box(0.15, 0.15, A.halfL * 2, nm, e * (A.halfW + 0.05), 3.2, 0));
@@ -463,7 +463,7 @@
         g.add(deck);
         // glowing lip
         var lipM = new THREE.MeshBasicMaterial({ color: col });
-        this.neon.push({ m: lipM, team: t });
+        lipM.userData.animated = true; this.neon.push({ m: lipM, team: t });
         g.add(box(w, 0.18, 0.3, lipM, cx, D.h + 0.05, zs * (D.zFront + 0.15)));
         g.add(box(0.3, 0.18, len, lipM, s * (D.xIn + 0.15), D.h + 0.05, cz));
         var archM = new THREE.MeshLambertMaterial({ color: '#ffffff' });
@@ -563,7 +563,7 @@
       var tower = box(T.halfW * 2, T.h, tlen, towerM, 0, T.h / 2, zs * (T.z + tlen / 2));
       tower.castShadow = true; g.add(tower);
       var neonM = new THREE.MeshBasicMaterial({ color: col });
-      this.neon.push({ m: neonM, team: t });
+      neonM.userData.animated = true; this.neon.push({ m: neonM, team: t });
       // neon trims on tower
       g.add(box(0.2, T.h, 0.2, neonM, -T.halfW, T.h / 2, zs * (T.z - 0.05)));
       g.add(box(0.2, T.h, 0.2, neonM, T.halfW, T.h / 2, zs * (T.z - 0.05)));
@@ -593,7 +593,7 @@
       if (zs > 0) emb.rotation.y = Math.PI;
       g.add(emb);
       var fm = new THREE.MeshBasicMaterial({ color: col });
-      this.neon.push({ m: fm, team: t });
+      fm.userData.animated = true; this.neon.push({ m: fm, team: t });
       var fr = 0.22;
       g.add(box(bw + fr * 2, fr, fr * 1.5, fm, 0, h.boardTop, bz));
       g.add(box(bw + fr * 2, fr, fr * 1.5, fm, 0, h.boardBottom, bz));
@@ -911,7 +911,10 @@
       for (i = 0; i < 14; i++) {
         var an5 = i / 14 * Math.PI * 2, r5 = 170 + (i % 3) * 30, hh5 = 70 + (i * 29 % 60);
         var mt = new THREE.Mesh(new THREE.ConeGeometry(55, hh5, 7), mtM); mt.position.set(Math.cos(an5) * r5, hh5 / 2 - 2, Math.sin(an5) * r5); g.add(mt);
-        var cp = new THREE.Mesh(new THREE.ConeGeometry(55 * 0.35, hh5 * 0.35, 7), capM); cp.position.set(Math.cos(an5) * r5, hh5 - hh5 * 0.175 - 2, Math.sin(an5) * r5); g.add(cp);
+        // snow cap sits clearly OUTSIDE the mountain surface: the old cap had exactly the same
+        // slope and peak, so the two surfaces overlapped and z-fought (flickered) at this distance
+        var capH = hh5 * 0.35 + 1.5, capR = 55 * 0.35 * 1.12;
+        var cp = new THREE.Mesh(new THREE.ConeGeometry(capR, capH, 7), capM); cp.position.set(Math.cos(an5) * r5, hh5 - 2 + 1.5 - capH / 2, Math.sin(an5) * r5); g.add(cp);
       }
       var pineM = this._m('pine', '#1f5a3a');
       for (i = 0; i < 40; i++) {

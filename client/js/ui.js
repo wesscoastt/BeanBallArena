@@ -372,6 +372,7 @@
     var tab = UI.setTab;
     if (tab === 'graphics') {
       box.appendChild(UI.slider('RENDER SCALE', 0.5, 1, 0.05, function () { return S.renderScale; }, function (v) { S.renderScale = v; save(); G.applyGraphics(); }, pct, 'Lower = faster on phones'));
+      box.appendChild(UI.toggle('AUTO RESOLUTION', function () { return S.autoRes; }, function (v) { S.autoRes = v; save(); G.dynScale = 1; G.applyGraphics(); }, 'Drops resolution a little when the game slows down, keeps it smooth'));
       box.appendChild(UI.toggle('SHADOWS', function () { return S.shadows; }, function (v) { S.shadows = v; save(); G.applyGraphics(); }));
       box.appendChild(UI.toggle('EFFECTS / PARTICLES', function () { return S.effects; }, function (v) { S.effects = v; save(); }));
       box.appendChild(UI.toggle('ANTI-ALIASING', function () { return S.antialias; }, function (v) { S.antialias = v; save(); }, 'Applies after reloading the page'));
@@ -450,7 +451,7 @@
 
   UI.restoreDefaults = function () {
     var tab = UI.setTab, map = {
-      graphics: ['renderScale', 'shadows', 'effects', 'antialias', 'fpsLimit'],
+      graphics: ['renderScale', 'shadows', 'effects', 'antialias', 'fpsLimit', 'autoRes'],
       audio: ['master', 'music', 'sfx', 'crowd'],
       controls: ['mouseSens', 'padSens', 'invertY', 'deadzone', 'vibration', 'autoCam', 'keys', 'pad', 'shotArc', 'aimAssist'],
       mobile: ['touchSize', 'touchOpacity', 'joySens', 'touchLayout', 'touchLook', 'stickSprint', 'dragButtonsLook'],
