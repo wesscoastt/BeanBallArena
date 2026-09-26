@@ -20,8 +20,11 @@
     master: 0.8, music: 0.55, sfx: 0.9, crowd: 0.6,
     // controls
     mouseSens: 1, padSens: 1, invertY: false, deadzone: 0.18, vibration: true, autoCam: true,
+    shotArc: 'full',                              // 'full' | 'short' | 'off'
+    aimAssist: isTouch ? 'strong' : 'normal',     // touch / controller only: 'strong' | 'normal' | 'off'
     // mobile
     touchSize: 1, touchOpacity: 0.75, joySens: 1, touchLayout: null,
+    touchLook: 0.8, stickSprint: true, dragButtonsLook: true,
     // accessibility
     colorblind: false, screenShake: true, reducedMotion: false, uiScale: 1, captions: false,
     showTutorialHint: true,
@@ -38,7 +41,8 @@
     lastSetup: { teamSize: 3, duration: 240, difficulty: 'normal', modifier: 'none', warmup: 45 },
     cosmetics: {
       color: '#ffd23f', pattern: 'solid', color2: '#ffffff', face: 'classic', hat: 'none',
-      upper: 'jersey', lower: 'shorts', celebration: 'hop', victory: 'backflip', number: 7, jerseyName: '', jerseyColor: 'team'
+      upper: 'jersey', lower: 'shorts', celebration: 'hop', victory: 'backflip', number: 7, jerseyName: '', jerseyColor: 'team',
+      jerseyColor2: '#ffffff', jerseyStyle: 'classic'
     }
   };
 
@@ -63,6 +67,8 @@
       try {
         var raw = root.localStorage && root.localStorage.getItem(KEY);
         if (raw) this.data = deepMerge(DEFAULTS, JSON.parse(raw));
+        // v0.5: the old on/off "full arc" toggle became the shotArc choice (full is now the default)
+        if (this.data.fullArc !== undefined) { delete this.data.fullArc; this.data.shotArc = 'full'; }
       } catch (e) { this.data = clone(DEFAULTS); }
       return this.data;
     },

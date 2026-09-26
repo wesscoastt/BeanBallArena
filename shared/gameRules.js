@@ -13,6 +13,8 @@
     teamSize: 3,
     duration: 240,        // seconds
     scoreLimit: 0,        // 0 = none
+    mercyLead: 12,        // win instantly when leading by this many points (0 = off)
+    kickoffReset: true,   // after every score, everyone goes back to their deck for a new drop
     overtime: true,
     difficulty: 'normal',
     autoFillBots: true,

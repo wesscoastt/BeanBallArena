@@ -295,6 +295,10 @@
     box.appendChild(UI.choice('BOT DIFFICULTY', [['easy', 'Easy'], ['normal', 'Normal'], ['hard', 'Hard']], function () { return L.difficulty; }, function (v) { L.difficulty = v; save(); }));
     box.appendChild(UI.choice('WARM-UP', [[0, 'Off'], [30, '30 seconds'], [45, '45 seconds'], [90, '90 seconds'], [-1, "Until I'm ready"]],
       function () { return L.warmup === undefined ? 45 : L.warmup; }, function (v) { L.warmup = v; save(); }, 'Practice on the court before the match starts'));
+    box.appendChild(UI.choice('MERCY RULE', [[0, 'Off'], [8, 'Lead by 8'], [10, 'Lead by 10'], [12, 'Lead by 12'], [15, 'Lead by 15']],
+      function () { return L.mercyLead === undefined ? 12 : L.mercyLead; }, function (v) { L.mercyLead = v; save(); }, 'A team that gets this far ahead wins right away'));
+    box.appendChild(UI.choice('AFTER A SCORE', [[true, 'Reset to decks'], [false, 'Keep playing']],
+      function () { return L.kickoffReset !== false; }, function (v) { L.kickoffReset = v; save(); }, 'Everyone drops from their deck again after each basket'));
     box.appendChild(UI.choice('MODIFIER', [['none', 'None (standard)'], ['superbounce', 'Super Bounce'], ['lowgravity', 'Low Gravity'], ['heavyball', 'Heavy Ball'], ['megaball', 'Mega Ball'], ['turbo', 'Turbo']],
       function () { return L.modifier || 'none'; }, function (v) { L.modifier = v; save(); }, 'Optional fun rules'));
     UI.teamsPreview();
@@ -322,6 +326,9 @@
     }
     box.appendChild(UI.swatches('BODY COLOR', COS.colors, function () { return cos.color; }, function (v) { cos.color = v; upd(); }));
     box.appendChild(UI.swatches('JERSEY COLOR', ['team'].concat(COS.colors), function () { return cos.jerseyColor || 'team'; }, function (v) { cos.jerseyColor = v; upd(); }));
+    box.appendChild(UI.swatches('JERSEY SECOND COLOR', ['#ffffff', 'team'].concat(COS.colors.filter(function (c) { return c !== '#f2f2f2'; })).concat(['#1c1c28']),
+      function () { return cos.jerseyColor2 || '#ffffff'; }, function (v) { cos.jerseyColor2 = v; upd(); }));
+    ch('JERSEY STYLE', 'jerseyStyle', COS.jerseyStyles);
     ch('PATTERN', 'pattern', COS.patterns);
     box.appendChild(UI.swatches('PATTERN COLOR', COS.colors, function () { return cos.color2; }, function (v) { cos.color2 = v; upd(); }));
     ch('FACE', 'face', COS.faces);
@@ -340,7 +347,8 @@
     function pk(a) { return a[Math.floor(Math.random() * a.length)]; }
     cos.color = pk(COS.colors); cos.color2 = pk(COS.colors); cos.pattern = pk(COS.patterns)[0]; cos.face = pk(COS.faces)[0];
     cos.hat = pk(COS.hats)[0]; cos.upper = pk(COS.uppers)[0]; cos.lower = pk(COS.lowers)[0];
-    cos.celebration = pk(COS.celebrations)[0]; cos.jerseyColor = Math.random() < 0.5 ? 'team' : pk(COS.colors); cos.victory = pk(COS.victories)[0]; cos.number = Math.floor(Math.random() * 100);
+    cos.celebration = pk(COS.celebrations)[0]; cos.jerseyColor = Math.random() < 0.5 ? 'team' : pk(COS.colors);
+    cos.jerseyColor2 = Math.random() < 0.4 ? '#ffffff' : pk(COS.colors); cos.jerseyStyle = pk(COS.jerseyStyles)[0]; cos.victory = pk(COS.victories)[0]; cos.number = Math.floor(Math.random() * 100);
     BBA.Settings.save();
     UI.buildCustomize(); UI.refreshCard();
   };
@@ -388,7 +396,8 @@
       box.appendChild(UI.toggle('INVERT CAMERA Y', function () { return S.invertY; }, function (v) { S.invertY = v; save(); }));
       box.appendChild(UI.toggle('VIBRATION', function () { return S.vibration; }, function (v) { S.vibration = v; save(); }));
       box.appendChild(UI.toggle('AUTO CAMERA (pad/touch)', function () { return S.autoCam; }, function (v) { S.autoCam = v; save(); }, 'Camera gently swings behind you while running'));
-      box.appendChild(UI.toggle('FULL SHOT ARC', function () { return !!S.fullArc; }, function (v) { S.fullArc = v; save(); }, 'Assist: show the whole shot path (easier)'));
+      box.appendChild(UI.choice('SHOT ARC', [['full', 'Full path'], ['short', 'Short (harder)'], ['off', 'Off']], function () { return S.shotArc || 'full'; }, function (v) { S.shotArc = v; save(); }, 'Shows where your shot will go. Turns green when it is going in'));
+      box.appendChild(UI.choice('AIM ASSIST (pad/touch)', [['strong', 'Strong'], ['normal', 'Normal'], ['off', 'Off']], function () { return S.aimAssist || 'normal'; }, function (v) { S.aimAssist = v; save(); }, 'While charging a shot, the camera turns toward the hoop'));
       box.appendChild(el('div', 'orow', '<div class="olab" style="color:#ffc93c">KEYBOARD + MOUSE</div>'));
       var acts = [['forward', 'Move forward'], ['back', 'Move back'], ['left', 'Move left'], ['right', 'Move right'], ['jump', 'Jump'], ['sprint', 'Sprint'], ['dive', 'Dive / tackle'],
         ['grab', 'Grab / pick up'], ['shoot', 'Shoot (hold)'], ['pass', 'Pass / call for pass'], ['aim', 'Aim'], ['ballcam', 'Ball camera'], ['pause', 'Pause']];
@@ -399,7 +408,10 @@
     } else if (tab === 'mobile') {
       box.appendChild(UI.slider('BUTTON SIZE', 0.7, 1.5, 0.05, function () { return S.touchSize; }, function (v) { S.touchSize = v; save(); BBA.Controls.applyTouchLayout(); }, pct));
       box.appendChild(UI.slider('BUTTON OPACITY', 0.25, 1, 0.05, function () { return S.touchOpacity; }, function (v) { S.touchOpacity = v; save(); BBA.Controls.applyTouchLayout(); }, pct));
-      box.appendChild(UI.slider('JOYSTICK SENSITIVITY', 0.5, 2, 0.1, function () { return S.joySens; }, function (v) { S.joySens = v; save(); }, function (v) { return v.toFixed(1); }, 'Higher = sprint with less thumb travel'));
+      box.appendChild(UI.slider('JOYSTICK SENSITIVITY', 0.5, 2, 0.1, function () { return S.joySens; }, function (v) { S.joySens = v; save(); }, function (v) { return v.toFixed(1); }, 'Higher = full speed with less thumb travel'));
+      box.appendChild(UI.slider('LOOK SENSITIVITY', 0.3, 2, 0.05, function () { return S.touchLook || 0.8; }, function (v) { S.touchLook = v; save(); }, function (v) { return v.toFixed(2); }, 'How fast swiping turns the camera'));
+      box.appendChild(UI.toggle('SPRINT AT FULL TILT', function () { return S.stickSprint; }, function (v) { S.stickSprint = v; save(); }, 'Push the stick all the way to sprint. Off = never sprint (easier turning)'));
+      box.appendChild(UI.toggle('DRAG BUTTONS TO LOOK', function () { return S.dragButtonsLook; }, function (v) { S.dragButtonsLook = v; save(); }, 'Hold Shoot and slide your thumb to aim'));
       box.appendChild(UI.button('BUTTON LAYOUT', 'EDIT', function () { UI.editTouch(); }, 'Drag buttons where you want them'));
       box.appendChild(UI.button('RESET LAYOUT', 'RESET', function () { S.touchLayout = null; save(); BBA.Controls.applyTouchLayout(); }));
     } else if (tab === 'access') {
@@ -440,8 +452,8 @@
     var tab = UI.setTab, map = {
       graphics: ['renderScale', 'shadows', 'effects', 'antialias', 'fpsLimit'],
       audio: ['master', 'music', 'sfx', 'crowd'],
-      controls: ['mouseSens', 'padSens', 'invertY', 'deadzone', 'vibration', 'autoCam', 'keys', 'pad', 'fullArc'],
-      mobile: ['touchSize', 'touchOpacity', 'joySens', 'touchLayout'],
+      controls: ['mouseSens', 'padSens', 'invertY', 'deadzone', 'vibration', 'autoCam', 'keys', 'pad', 'shotArc', 'aimAssist'],
+      mobile: ['touchSize', 'touchOpacity', 'joySens', 'touchLayout', 'touchLook', 'stickSprint', 'dragButtonsLook'],
       access: ['colorblind', 'screenShake', 'reducedMotion', 'uiScale', 'captions']
     };
     BBA.Settings.reset(map[tab]);
@@ -594,6 +606,14 @@
       $('charge-fg').style.strokeDashoffset = String(264 * (1 - lp.charge));
       var ah = sim.attackHoop(lp.team), dd = Math.sqrt((ah.x - lp.x) * (ah.x - lp.x) + (ah.z - lp.z) * (ah.z - lp.z));
       $('charge-txt').textContent = dd >= ah.threeDist ? '3 PT' : 'SHOOT';
+      // sweet spot: the charge range where the shot is on target (release inside the green band)
+      var si = G.shotInfo, zone = $('charge-zone');
+      if (si && si.active && si.perfect >= 0) {
+        var z0 = clamp(si.perfect - si.window * 0.6, 0, 1), z1 = clamp(si.perfect + si.window * 0.6, 0, 1);
+        zone.style.strokeDasharray = ((z1 - z0) * 264).toFixed(1) + ' 264';
+        zone.style.strokeDashoffset = String(-z0 * 264);
+      } else zone.style.strokeDasharray = '0 264';
+      ch.classList.toggle('good', !!(si && si.active && si.makes));
     } else ch.style.display = 'none';
     $('crosshair').style.display = (lp.charging || (lp.input && lp.input.aim)) ? 'block' : 'none';
 
@@ -604,7 +624,7 @@
     else if (hasBall && sim.dunkEligible(lp)) { txt = 'DUNK! ' + key('shoot'); cls = 'dunk'; }
     else if (hasBall) {
       var h = sim.attackHoop(lp.team), hd = Math.sqrt((h.x - lp.x) * (h.x - lp.x) + (h.z - lp.z) * (h.z - lp.z));
-      if (lp.charging) txt = 'Release ' + key('shoot') + ' to shoot';
+      if (lp.charging) txt = (G.shotInfo && G.shotInfo.makes) ? 'Release now! ' + key('shoot') : 'Release ' + key('shoot') + ' when the arc turns green';
       else if (lp.passHeld && lp.passT > 0.2) txt = lp.passAim >= 0 ? 'Release to pass' : 'Release to throw';
       else if (hd < 7) txt = key('jump') + ' then ' + key('shoot') + ' in the air to DUNK';
       else if (UI.hintT < 40 || hd < 18) txt = 'Hold ' + key('shoot') + ' shoot · ' + key('pass') + ' pass';

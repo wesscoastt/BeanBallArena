@@ -73,12 +73,21 @@
       this.idleLook = 0;
     }
 
-    // gentle auto-follow behind movement for pad / touch players
+    // shot aim assist: pull the view (and so the throw direction) toward the hoop
+    if (f.aimK > 0 && f.aimYaw !== undefined) {
+      var ad = wrap(f.aimYaw - this.yaw);
+      if (Math.abs(ad) < 1.6) this.yaw = wrap(this.yaw + ad * damp(f.aimK, dt));
+    }
+
+    // auto-follow behind movement for pad / touch players (touch swings sooner and harder:
+    // looking around with a thumb is the hard part on phones)
     var device = ctl ? ctl.device : 'kbm';
-    if (S.autoCam && device !== 'kbm' && this.idleLook > 0.9 && f.speed > 3 && !f.aiming) {
+    var touch = device === 'touch';
+    if (S.autoCam && device !== 'kbm' && this.idleLook > (touch ? 0.35 : 0.9) && f.speed > (touch ? 1.5 : 3) && !f.aiming) {
       var hy = Math.atan2(f.vx, f.vz);
       var d = wrap(hy - this.yaw);
-      if (Math.abs(d) < 2.3) this.yaw = wrap(this.yaw + d * Math.min(1, dt * 1.1 * Math.min(1, f.speed / 9)));
+      var rate = touch ? 2.4 : 1.1;
+      if (Math.abs(d) < (touch ? 2.6 : 2.3)) this.yaw = wrap(this.yaw + d * Math.min(1, dt * rate * Math.min(1, f.speed / 8)));
       this.pitch += (0.3 - this.pitch) * damp(1.5, dt);
     }
 

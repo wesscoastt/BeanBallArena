@@ -77,6 +77,9 @@ body.in-menu #scr-main.on { background: linear-gradient(90deg, rgba(10,14,50,.72
 .pbtn.back { background: linear-gradient(#3a3f5e, #2a2e48); }
 .opt-list { display: flex; flex-direction: column; gap: 6px; }
 .opt-list.scroll { overflow-y: auto; max-height: 56vh; padding-right: 4px; -webkit-overflow-scrolling: touch; }
+/* long option lists scroll inside the panel so the action buttons always stay on screen (phones in landscape) */
+.panel > .opt-list { min-height: 0; flex: 1 1 auto; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-right: 4px; }
+.panel > h2, .panel > .panel-actions, .panel > .teams-preview { flex-shrink: 0; }
 .orow { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; background: rgba(255,255,255,.05); border: 2px solid transparent; border-radius: 10px; padding: 7px 10px; min-height: 44px; }
 .orow.focus { border-color: #9fb6ff; background: rgba(160,180,255,.12); }
 .orow .olab { font: 16px var(--font-h); letter-spacing: .4px; }
@@ -205,6 +208,9 @@ body.cb .sb-red { background: linear-gradient(#ffb04a, #ff9a1f); }
 #charge { position: absolute; left: 50%; bottom: 20%; width: 92px; height: 92px; margin-left: -46px; display: none; }
 #charge svg { width: 100%; height: 100%; transform: rotate(-90deg); }
 #charge .c-bg { fill: rgba(10,14,50,.55); stroke: rgba(255,255,255,.25); stroke-width: 8; }
+#charge .c-zone { fill: none; stroke: rgba(61,255,122,.55); stroke-width: 14; stroke-dasharray: 0 264; }
+#charge.good .c-fg { stroke: #3dff7a; }
+#charge.good #charge-txt { color: #3dff7a; }
 #charge .c-fg { fill: none; stroke: var(--gold); stroke-width: 8; stroke-linecap: round; stroke-dasharray: 264; stroke-dashoffset: 264; }
 #charge-txt { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 15px var(--font-h); }
 #prompt { position: absolute; left: 50%; bottom: calc(9% + env(safe-area-inset-bottom)); transform: translateX(-50%); font: 22px var(--font-h); text-shadow: 0 3px 0 #000; white-space: nowrap; }
@@ -269,6 +275,7 @@ body.touch-on #feed { top: calc(max(12px, env(safe-area-inset-top)) + 46px); wid
   #banner .b-title { font-size: 44px; } #banner.count .b-title, #banner.go .b-title { font-size: 72px; }
   .panel { padding: 12px 14px; } .panel h2 { font-size: 24px; margin-bottom: 6px; }
   .opt-list.scroll { max-height: 50vh; }
+  #teams-preview { display: none; }
   .orow { min-height: 38px; padding: 4px 8px; }
   .sb-team { height: 38px; font-size: 16px; } .sb-score { font-size: 26px; } .sb-clock { font-size: 22px; min-width: 80px; }
   #radar { width: 64px; height: 104px; }

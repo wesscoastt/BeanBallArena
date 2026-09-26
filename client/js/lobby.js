@@ -74,6 +74,8 @@
     ['duration', 'MATCH LENGTH', [[180, '3 min'], [240, '4 min'], [300, '5 min'], [420, '7 min']]],
     ['warmup', 'WARM-UP', [[0, 'Off'], [30, '30 s'], [60, '60 s'], [120, '2 min'], [-1, 'Until all ready']]],
     ['scoreLimit', 'SCORE LIMIT', [[0, 'None'], [10, '10'], [15, '15'], [21, '21']]],
+    ['mercyLead', 'MERCY RULE', [[0, 'Off'], [8, 'Lead by 8'], [10, 'Lead by 10'], [12, 'Lead by 12'], [15, 'Lead by 15']]],
+    ['kickoffReset', 'AFTER A SCORE', [[true, 'Reset to decks'], [false, 'Keep playing']]],
     ['difficulty', 'BOT DIFFICULTY', [['easy', 'Easy'], ['normal', 'Normal'], ['hard', 'Hard']]],
     ['autoFillBots', 'AUTO-FILL BOTS', [[true, 'On'], [false, 'Off']]],
     ['overtime', 'OVERTIME', [[true, 'On'], [false, 'Off (draws allowed)']]],

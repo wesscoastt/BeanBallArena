@@ -147,7 +147,8 @@
 
     // accessories
     if (ch.propeller) ch.propeller.rotation.y += dt * (6 + sp * 3);
-    if (ch.cape) ch.cape.rotation.x = damp(ch.cape.rotation.x, -0.15 - clamp(sp / 10, 0, 1) * 0.9 + (v.grounded ? 0 : -0.3) + Math.sin(t * 9) * 0.05, 8, dt);
+    // positive = swing backward, away from the body (never into it)
+    if (ch.cape) ch.cape.rotation.x = damp(ch.cape.rotation.x, 0.2 + clamp(sp / 10, 0, 1) * 0.9 + (v.grounded ? 0 : 0.3) + Math.sin(t * 9) * 0.05, 8, dt);
     if (ch.antenna) ch.antenna.position.x = Math.sin(t * 6) * 0.03 * (1 + sp * 0.2);
 
     // footstep hook

@@ -8,7 +8,7 @@
   else { root.BBA = root.BBA || {}; root.BBA.C = mod; }
 })(this, function () {
   return {
-    VERSION: '0.4.0',
+    VERSION: '0.5.0',
     TICK: 1 / 60,
 
     TEAM_BLUE: 0,
@@ -85,8 +85,15 @@
       assistYaw: 0.45,
       assistYawStrength: 0.8,
       assistWindow: 0.15,
-      assistStrength: 0.65
+      assistStrength: 0.65,
+      // human players get a more forgiving assist (touch / pad aiming is harder than a bot's math)
+      humanAssistYaw: 0.62,
+      humanAssistYawStrength: 0.9,
+      humanAssistWindow: 0.19,
+      humanAssistStrength: 0.75
     },
+
+    KICKOFF: { countdown: 2 },
 
     DUNK: {
       range: 2.9,

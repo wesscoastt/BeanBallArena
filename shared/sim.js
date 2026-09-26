@@ -106,8 +106,9 @@
     return { humans: humans, ready: ready };
   };
 
-  Sim.prototype._endWarmup = function () {
-    var m = this.match, i;
+  /* Send everyone back to their team deck and hover the ball at center. */
+  Sim.prototype._resetToDecks = function (resetStats) {
+    var i;
     this._forceRelease();
     for (i = 0; i < this.players.length; i++) {
       var p = this.players[i];
@@ -116,16 +117,43 @@
     for (i = 0; i < this.players.length; i++) {
       var q = this.players[i];
       q.x = q.spawnX; q.z = q.spawnZ; q.y = this.arena.groundHeight(q.x, q.z);
-      q.vx = 0; q.vy = 0; q.vz = 0; q.grounded = true; q.hidden = false;
-      q.state = 'normal'; q.stateT = 0; q.dunk = null; q.charging = false; q.passHeld = false;
-      q.grabbedBy = -1; q.grabTarget = -1; q.celebrateT = 0; q.callT = 0; q.launchT = 0; q.stunImmune = 0;
+      q.vx = 0; q.vy = 0; q.vz = 0; q.grounded = true; q.hidden = false; q.respawnT = 0;
+      q.state = 'normal'; q.stateT = 0; q.dunk = null; q.charging = false; q.passHeld = false; q.passAim = -1;
+      q.grabbedBy = -1; q.grabTarget = -1; q.callT = 0; q.launchT = 0; q.stunImmune = 0; q.wobble = 0;
+      q.diveCd = 0; q.grabCd = 0; q.throwAnim = 0;
       q.yaw = q.team === 0 ? 0 : Math.PI;
-      q.stats = { pts: 0, dunks: 0, shots: 0, made: 0, passes: 0, steals: 0, tackles: 0, intercepts: 0, assists: 0 };
+      if (resetStats) {
+        q.celebrateT = 0;
+        q.stats = { pts: 0, dunks: 0, shots: 0, made: 0, passes: 0, steals: 0, tackles: 0, intercepts: 0, assists: 0 };
+      }
     }
     this._placeBallSpawn(true);
+  };
+
+  Sim.prototype._endWarmup = function () {
+    var m = this.match;
+    this._resetToDecks(true);
     this.warmBallT = 0;
     m.phase = 'countdown'; m.phaseT = 0; m.lastSec = -1;
     this.emit({ t: 'warmupEnd' });
+  };
+
+  /* After a score: back to the decks and a short countdown, like the opening drop. */
+  Sim.prototype._kickoff = function () {
+    var m = this.match;
+    this._resetToDecks(false);
+    m.phase = 'countdown'; m.phaseT = 0; m.lastSec = -1;
+    m.countdown = C.KICKOFF.countdown;
+    this.emit({ t: 'kickoff' });
+  };
+
+  /* Team currently ahead by the mercy margin, or -1. */
+  Sim.prototype.mercyWinner = function () {
+    var lead = this.settings.mercyLead, sc = this.match.score;
+    if (!(lead > 0) || this.mode !== 'match') return -1;
+    if (sc[0] - sc[1] >= lead) return 0;
+    if (sc[1] - sc[0] >= lead) return 1;
+    return -1;
   };
 
   Sim.emptyInput = emptyInput;
@@ -272,11 +300,15 @@
         this.emit({ t: 'ballGone' });
       }
       if (m.phaseT >= C.SCORE.celebrate) {
-        var lim = this.settings.scoreLimit;
-        if (this.mode === 'match' && (m.overtime || (lim > 0 && (m.score[0] >= lim || m.score[1] >= lim)))) {
+        var lim = this.settings.scoreLimit, mw = this.mercyWinner();
+        if (mw >= 0) {
+          this._endMatch(mw, 'mercy');
+        } else if (this.mode === 'match' && (m.overtime || (lim > 0 && (m.score[0] >= lim || m.score[1] >= lim)))) {
           this._endMatch(m.score[0] > m.score[1] ? 0 : (m.score[1] > m.score[0] ? 1 : -1));
         } else if (this.mode === 'match' && m.clock <= 0) {
           this._resolveEnd();
+        } else if (this.mode === 'match' && this.settings.kickoffReset) {
+          this._kickoff();
         } else {
           m.phase = 'play'; m.phaseT = 0;
           this._dropBall();
@@ -298,9 +330,9 @@
     }
   };
 
-  Sim.prototype._endMatch = function (winner) {
+  Sim.prototype._endMatch = function (winner, reason) {
     var m = this.match;
-    m.phase = 'ended'; m.phaseT = 0; m.winner = winner;
+    m.phase = 'ended'; m.phaseT = 0; m.winner = winner; m.endReason = reason || '';
     this._forceRelease();
     var i;
     for (i = 0; i < this.players.length; i++) {
@@ -308,7 +340,7 @@
       p.charging = false; p.passHeld = false;
       if (p.grabTarget >= 0) this._releaseGrab(p);
     }
-    this.emit({ t: 'end', winner: winner, score: [m.score[0], m.score[1]] });
+    this.emit({ t: 'end', winner: winner, score: [m.score[0], m.score[1]], reason: m.endReason });
   };
 
   Sim.prototype._forceRelease = function () {
@@ -1087,12 +1119,15 @@
     var tx = h.x - o.x, tz = h.z - o.z, td = Math.sqrt(tx * tx + tz * tz);
     var hoopYaw = Math.atan2(tx, tz);
     var dyaw = wrapAngle(hoopYaw - yaw);
-    var assisted = false;
-    if (Math.abs(dyaw) < SH.assistYaw) { yaw = yaw + dyaw * SH.assistYawStrength; assisted = true; }
+    var assisted = false, hu = !p.isBot;
+    var aYaw = hu ? SH.humanAssistYaw : SH.assistYaw, aYawK = hu ? SH.humanAssistYawStrength : SH.assistYawStrength;
+    var aWin = hu ? SH.humanAssistWindow : SH.assistWindow, aK = hu ? SH.humanAssistStrength : SH.assistStrength;
+    if (Math.abs(dyaw) < aYaw) { yaw = yaw + dyaw * aYawK; assisted = true; }
     var c = charge;
     if (assisted) {
       var cs = this._perfectCharge(p, o, yaw, h);
-      if (cs >= 0 && Math.abs(c - cs) < SH.assistWindow) c = c + (cs - c) * SH.assistStrength;
+      out.window = aWin;
+      if (cs >= 0 && Math.abs(c - cs) < aWin) c = c + (cs - c) * aK;
       out.perfect = cs;
     } else { out.perfect = -1; }
     this._shotVel(p, o, c, yaw, out);
@@ -1563,7 +1598,18 @@
     var pts = [{ x: L.ox, y: L.oy, z: L.oz, t: 0 }];
     var more = this.predictBall(seconds || 1.6, 1 / 30, { x: L.ox, y: L.oy, z: L.oz, vx: L.vx, vy: L.vy, vz: L.vz });
     for (var i = 0; i < more.length; i++) pts.push(more[i]);
-    return { points: pts, launch: L };
+    // does the predicted path drop through the ring? (includes board / rim bounces)
+    var h = this.attackHoop(p.team), makes = false, endIdx = pts.length - 1, lim = h.ringR - this.ballRadius * 0.55;
+    for (i = 1; i < pts.length; i++) {
+      var a = pts[i - 1], q = pts[i];
+      if (a.y >= h.y && q.y < h.y) {
+        var k = (a.y - h.y) / ((a.y - q.y) || 1);
+        var cx = a.x + (q.x - a.x) * k - h.x, cz = a.z + (q.z - a.z) * k - h.z;
+        if (cx * cx + cz * cz < lim * lim) { makes = true; endIdx = i; break; }
+      }
+      if (q.g) { endIdx = i; break; }
+    }
+    return { points: pts, launch: L, makes: makes, endIdx: endIdx };
   };
 
   /* Compact snapshot for network / debugging (milestone 2 uses this). */

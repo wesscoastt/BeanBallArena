@@ -105,7 +105,8 @@
       color: pick(COS.colors, r), color2: pick(COS.colors, r), pattern: r() < 0.5 ? 'solid' : pick(COS.patterns, r)[0],
       face: pick(COS.faces, r)[0], hat: r() < 0.35 ? 'none' : pick(COS.hats, r)[0], upper: r() < 0.8 ? 'jersey' : pick(COS.uppers, r)[0],
       lower: pick(COS.lowers, r)[0], celebration: pick(COS.celebrations, r)[0], victory: pick(COS.victories, r)[0],
-      number: 1 + Math.floor(r() * 98)
+      number: 1 + Math.floor(r() * 98),
+      jerseyColor2: r() < 0.5 ? '#ffffff' : pick(COS.colors, r), jerseyStyle: r() < 0.4 ? 'classic' : pick(COS.jerseyStyles, r)[0]
     };
   }
   function rng32(seed) { var a = seed >>> 0; return function () { a |= 0; a = a + 0x6D2B79F5 | 0; var t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -316,7 +317,8 @@
     for (i = 0; i < size; i++) { roster.push({ team: 1, name: names[ni++], isBot: true }); G.cosmetics.push(randomCosmetics(r)); }
     G.sim = new BBA.Sim({
       roster: roster, mode: 'match', seed: (r() * 1e9) | 0, countdown: 3.5, warmup: wu,
-      settings: { duration: setup.duration || 240, difficulty: setup.difficulty || 'normal', modifier: setup.modifier || 'none', teamSize: size, arena: setup.arena || 'bean_bowl' }
+      settings: { duration: setup.duration || 240, difficulty: setup.difficulty || 'normal', modifier: setup.modifier || 'none', teamSize: size, arena: setup.arena || 'bean_bowl',
+        mercyLead: setup.mercyLead === undefined ? 12 : setup.mercyLead, kickoffReset: setup.kickoffReset !== false }
     });
     G.ai = new BBA.AI(G.sim);
     for (i = 1; i < roster.length; i++) G.ai.addBot(i, setup.difficulty || 'normal');
@@ -696,6 +698,13 @@
             if (G.net) G.net.myReady = false;
           }
           break;
+        case 'kickoff':
+          if (!menu) {
+            UI.banner('BACK TO THE DECKS!', 'Next drop in 2…', 'warn');
+            BBA.Audio.play('launch');
+            if (G.localId >= 0) { var kl = sim.players[G.localId]; G.rig.snapBehind(kl.team === 0 ? 0 : Math.PI, kl); G.rig.pitch = 0.42; }
+          }
+          break;
         case 'practiceScore':
           if (!menu) {
             var hp = sim.hoops[1 - e.team];
@@ -820,7 +829,7 @@
         case 'end':
           if (!menu) {
             var won = e.winner === localTeam;
-            UI.banner(e.winner < 0 ? 'DRAW!' : (C.TEAM_NAMES[e.winner] + ' WINS!'), e.score[0] + ' - ' + e.score[1], e.winner === 0 ? 'score blue' : 'score red');
+            UI.banner(e.winner < 0 ? 'DRAW!' : (C.TEAM_NAMES[e.winner] + ' WINS!'), (e.reason === 'mercy' ? 'MERCY RULE · ' : '') + e.score[0] + ' - ' + e.score[1], e.winner === 0 ? 'score blue' : 'score red');
             BBA.Audio.play(won ? 'victory' : 'defeat');
             BBA.Audio.setMusic('menu');
             G.endT = 0;
@@ -890,9 +899,17 @@
         if (resT > resAt && !G.resultsShown) { G.resultsShown = true; BBA.UI.showResults(sim, G.localId, G.teamCss, !!G.podium); }
       } else {
         var aiming = lp.charging || (lp.passHeld && lp.passT > 0.2) || (ctl && ctl.held.aim);
+        // aim assist (touch / controller): while charging a shot, ease the camera toward the hoop
+        var aa = BBA.Settings.data.aimAssist, aimYaw, aimK = 0;
+        if (lp.charging && b.holder === lp.id && ctl && ctl.device !== 'kbm' && aa && aa !== 'off') {
+          var ahp = sim.attackHoop(lp.team);
+          aimYaw = Math.atan2(ahp.x - lp.x, ahp.z - lp.z);
+          aimK = aa === 'strong' ? 7 : 3.5;
+        }
         G.rig.update(dt, {
           x: lv.pos.x, y: lv.pos.y, z: lv.pos.z, vx: lp.vx, vz: lp.vz, speed: hyp(lp.vx, lp.vz),
-          sprinting: lp.sprinting, aiming: aiming, hasBall: b.holder === lp.id, airborne: !lp.grounded
+          sprinting: lp.sprinting, aiming: aiming, hasBall: b.holder === lp.id, airborne: !lp.grounded,
+          aimYaw: aimYaw, aimK: aimK
         }, G.paused ? null : ctl, ballVis);
       }
       G._updateAimHelpers(lp);
@@ -938,6 +955,14 @@
     G.arc.frustumCulled = false;
     G.arc.visible = false;
     G.scene.add(G.arc);
+    // bold dot trail (WebGL lines are 1px - too thin to read on a phone)
+    G.arcDots = new THREE.InstancedMesh(new THREE.SphereGeometry(0.1, 8, 6), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.95, depthTest: false }), 30);
+    G.arcDots.setColorAt(0, new THREE.Color('#ffffff'));
+    G.arcDots.renderOrder = 10; G.arcDots.frustumCulled = false; G.arcDots.visible = false;
+    G.scene.add(G.arcDots);
+    G.arcEnd = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.07, 6, 24), new THREE.MeshBasicMaterial({ color: '#3dff7a', transparent: true, opacity: 0.9, depthTest: false }));
+    G.arcEnd.rotation.x = Math.PI / 2; G.arcEnd.visible = false; G.arcEnd.renderOrder = 11;
+    G.scene.add(G.arcEnd);
     G.passRing = new THREE.Mesh(new THREE.RingGeometry(0.9, 1.15, 32), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.9, depthTest: false }));
     G.passRing.rotation.x = -Math.PI / 2; G.passRing.visible = false; G.passRing.renderOrder = 10;
     G.scene.add(G.passRing);
@@ -945,27 +970,54 @@
 
   G._updateAimHelpers = function (lp) {
     var sim = G.sim;
-    if (lp.charging && sim.ball.holder === lp.id) {
-      var pr = sim.previewShot(lp, lp.charge, lp.input.look, 1.4);
-      var pts = pr.points, n = 48;
-      // only show the first part of the flight so shooting still takes skill
-      var tMax = 0;
-      for (var k = 0; k < pts.length; k++) { if (pts[k].t > tMax) tMax = pts[k].t; }
-      var show = BBA.Settings.data.fullArc ? 1.4 : 0.62;
+    var SD = BBA.Settings.data, info = G.shotInfo || (G.shotInfo = {});
+    info.active = false;
+    if (lp.charging && sim.ball.holder === lp.id && SD.shotArc !== 'off') {
+      var pr = sim.previewShot(lp, lp.charge, lp.input.look, 2.2);
+      var pts = pr.points, n = 48, L = pr.launch;
+      // full path by default (ends where it drops through the ring or lands); 'short' keeps the old skill mode
+      var show = SD.shotArc === 'short' ? 0.62 : pts[pr.endIdx].t;
+      var inWin = L.perfect >= 0 && Math.abs(lp.charge - L.perfect) < (L.window || 0.2);
+      info.active = true; info.perfect = L.perfect; info.window = L.window || 0.2; info.makes = pr.makes; info.inWin = inWin;
       var pos = G.arc.geometry.attributes.position, col = G.arc.geometry.attributes.color;
-      var last = pts[0], j = 0, c = new THREE.Color();
+      var j = 0, c = G._arcCol || (G._arcCol = new THREE.Color());
       for (var i = 0; i < n; i++) {
         var tt = show * i / (n - 1);
         while (j < pts.length - 1 && pts[j + 1].t < tt) j++;
-        var p = pts[j];
-        pos.setXYZ(i, p.x, p.y, p.z);
-        c.setHSL(0.13 - 0.13 * lp.charge, 1, 0.55 + 0.3 * (1 - i / n));
+        var p = pts[j], p2 = pts[Math.min(j + 1, pts.length - 1)];
+        var f = p2.t > p.t ? Math.max(0, Math.min(1, (tt - p.t) / (p2.t - p.t))) : 0;
+        pos.setXYZ(i, p.x + (p2.x - p.x) * f, p.y + (p2.y - p.y) * f, p.z + (p2.z - p.z) * f);
+        var lt = 0.5 + 0.3 * (1 - i / n);
+        if (pr.makes) c.setHSL(0.36, 1, lt);                 // green: this one's going in
+        else if (inWin) c.setHSL(0.2, 1, lt);               // yellow-green: close, assist will help
+        else c.setHSL(0.1 - 0.1 * lp.charge, 1, lt);       // orange/red: off target
         col.setXYZ(i, c.r, c.g, c.b);
       }
       pos.needsUpdate = true; col.needsUpdate = true;
       G.arc.computeLineDistances();
       G.arc.visible = true;
-    } else G.arc.visible = false;
+      // dots along the same path, marching forward so the direction reads like an arrow
+      var nd = 30, dm = G._dotM || (G._dotM = new THREE.Matrix4()), march = (performance.now() * 0.0012) % 1;
+      for (var d = 0; d < nd; d++) {
+        var fi = (d + march) / nd * (n - 1), i0 = Math.floor(fi), i1 = Math.min(n - 1, i0 + 1), ff = fi - i0;
+        var px = pos.getX(i0) + (pos.getX(i1) - pos.getX(i0)) * ff, py = pos.getY(i0) + (pos.getY(i1) - pos.getY(i0)) * ff, pz = pos.getZ(i0) + (pos.getZ(i1) - pos.getZ(i0)) * ff;
+        var ds = d < 2 ? 0.4 + d * 0.3 : 1 - d / nd * 0.35;   // skip the dots right at the hands
+        dm.makeScale(ds, ds, ds); dm.setPosition(px, py, pz);
+        G.arcDots.setMatrixAt(d, dm);
+        c.setRGB(col.getX(i0), col.getY(i0), col.getZ(i0));
+        G.arcDots.setColorAt(d, c);
+      }
+      G.arcDots.instanceMatrix.needsUpdate = true;
+      if (G.arcDots.instanceColor) G.arcDots.instanceColor.needsUpdate = true;
+      G.arcDots.visible = true;
+      // landing marker at the end of the arc
+      var e2 = pts[pr.endIdx];
+      G.arcEnd.visible = SD.shotArc !== 'short';
+      G.arcEnd.position.set(e2.x, e2.y + 0.05, e2.z);
+      G.arcEnd.material.color.setHSL(pr.makes ? 0.36 : (inWin ? 0.2 : 0.07), 1, 0.55);
+      var es = 1 + Math.sin(performance.now() * 0.015) * 0.12;
+      G.arcEnd.scale.set(es, es, es);
+    } else { G.arc.visible = false; G.arcEnd.visible = false; G.arcDots.visible = false; }
     var target = lp.passHeld && lp.passT > 0.2 ? lp.passAim : -1;
     if (target >= 0) {
       var tv = G.views[target];

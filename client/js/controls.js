@@ -7,6 +7,7 @@
   var doc = root.document;
 
   var ACTIONS = ['jump', 'sprint', 'dive', 'grab', 'pass', 'shoot', 'aim', 'ballcam', 'ready'];
+  var SPRINT_AT = 0.9;   // touch stick tilt that triggers sprint
 
   var C = {
     keys: {},            // code -> down
@@ -254,14 +255,17 @@
         if (btn) {
           var act = btn.getAttribute('data-act');
           T.btnTouches[t.identifier] = act; T.held[act] = true; btn.classList.add('down');
+          // a thumb on a button can also slide to look around (hold Shoot + drag to aim)
+          if (T.camId < 0 && BBA.Settings.data.dragButtonsLook) { T.camId = t.identifier; T.camX = t.clientX; T.camY = t.clientY; T.camFromBtn = true; T.camMoved = 0; }
           continue;
         }
-        if (t.clientX < root.innerWidth * 0.45 && T.joyId < 0) {
+        if (t.clientX < root.innerWidth * 0.5 && T.joyId < 0) {
           T.joyId = t.identifier; T.ox = t.clientX; T.oy = t.clientY; T.joyX = 0; T.joyY = 0;
           joyBase.style.left = (t.clientX) + 'px'; joyBase.style.top = (t.clientY) + 'px';
           joyBase.classList.add('on'); joyKnob.style.transform = 'translate(-50%,-50%)';
-        } else if (T.camId < 0) {
-          T.camId = t.identifier; T.camX = t.clientX; T.camY = t.clientY;
+        } else if (T.camId < 0 || T.camFromBtn) {
+          // a free finger on the look side always wins over a button-drag look
+          T.camId = t.identifier; T.camX = t.clientX; T.camY = t.clientY; T.camFromBtn = false;
         }
       }
     }, { passive: false });
@@ -280,13 +284,21 @@
             dx = t.clientX - T.ox; dy = t.clientY - T.oy; m = Math.sqrt(dx * dx + dy * dy);
           }
           var k = Math.min(1, m / R);
+          // small dead zone so a resting thumb doesn't drift, rescaled so full tilt is still 1
+          k = k < 0.12 ? 0 : (k - 0.12) / 0.88;
           T.joyX = m > 0 ? dx / m * k : 0; T.joyY = m > 0 ? dy / m * k : 0;
           var vis = Math.min(m, R);
           joyKnob.style.transform = 'translate(calc(-50% + ' + (m > 0 ? dx / m * vis : 0) + 'px), calc(-50% + ' + (m > 0 ? dy / m * vis : 0) + 'px))';
-          joyBase.classList.toggle('sprint', k >= 0.8);
+          joyBase.classList.toggle('sprint', S.stickSprint && k >= SPRINT_AT);
         } else if (t.identifier === T.camId) {
-          T.camDX += t.clientX - T.camX; T.camDY += t.clientY - T.camY;
+          var mdx = t.clientX - T.camX, mdy = t.clientY - T.camY;
           T.camX = t.clientX; T.camY = t.clientY;
+          if (T.camFromBtn) {
+            // ignore the first few pixels so a normal button tap never nudges the camera
+            T.camMoved += Math.abs(mdx) + Math.abs(mdy);
+            if (T.camMoved < 14) continue;
+          }
+          T.camDX += mdx; T.camDY += mdy;
         }
       }
     }, { passive: false });
@@ -301,7 +313,7 @@
           if (C.touchBtnEls[act]) C.touchBtnEls[act].classList.remove('down');
         }
         if (t.identifier === T.joyId) { T.joyId = -1; T.joyX = 0; T.joyY = 0; joyBase.classList.remove('on'); joyBase.classList.remove('sprint'); }
-        if (t.identifier === T.camId) { T.camId = -1; }
+        if (t.identifier === T.camId) { T.camId = -1; T.camFromBtn = false; }
       }
     }
     ui.addEventListener('touchend', end);
@@ -379,11 +391,18 @@
       if (T.joyId >= 0) {
         st.mx = T.joyX; st.my = -T.joyY;
         var jm = Math.sqrt(T.joyX * T.joyX + T.joyY * T.joyY);
-        if (jm >= 0.8) h.sprint = true;      // sprint by pushing the stick ~80%+
+        if (S.stickSprint && jm >= SPRINT_AT) h.sprint = true;      // sprint by pushing the stick all the way
       }
       for (i = 0; i < ACTIONS.length; i++) if (T.held[ACTIONS[i]]) h[ACTIONS[i]] = true;
-      st.lookX += T.camDX * 0.0065 * S.mouseSens; st.lookY += T.camDY * 0.005 * S.mouseSens * (S.invertY ? -1 : 1);
+      // touch look: smoothed, with a gentle curve so small thumb moves are precise and big swipes still turn fast
+      var tdx = T.camDX, tdy = T.camDY;
       T.camDX = 0; T.camDY = 0;
+      T.smX = (T.smX || 0) + (tdx - (T.smX || 0)) * 0.6;
+      T.smY = (T.smY || 0) + (tdy - (T.smY || 0)) * 0.6;
+      var curve = function (v) { var a = Math.abs(v); return v * (0.55 + 0.45 * Math.min(1, a / 18)); };
+      var tl = (S.touchLook || 0.8) * S.mouseSens;
+      st.lookX += curve(T.smX) * 0.0062 * tl; st.lookY += curve(T.smY) * 0.0045 * tl * (S.invertY ? -1 : 1);
+      if (T.camId < 0 && Math.abs(T.smX) + Math.abs(T.smY) < 0.05) { T.smX = 0; T.smY = 0; }
     }
     // gamepad
     C.pollPad(st, dt);
