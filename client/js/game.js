@@ -772,9 +772,11 @@
           else if (e.kind === 'player') G.snd('bounce', e.x, e.y, e.z, { speed: e.v * 0.7 });
           break;
         case 'pad':
+          // the visual arena can change (lobby arena pick) while a menu demo sim is still on the old one
+          var pd = (sim.arena && sim.arena.pads ? sim.arena.pads : Arena.pads)[e.pad];
+          if (!pd) break;
           G.arena.pulsePad(e.pad);
           if (p) {
-            var pd = Arena.pads[e.pad];
             G.fx.burst('pad', pd.x, pd.y, pd.z, { color: pd.type === 'bounce' ? '#39e6ff' : '#ffd23f' });
             if (!menu) G.snd(e.kind === 'launch' ? 'launch' : 'pad', p.x, p.y, p.z);
             if (G._isLocal(p.id)) BBA.Controls.rumble(0.35, 120);
