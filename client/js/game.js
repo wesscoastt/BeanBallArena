@@ -843,6 +843,7 @@
             if (!menu) UI.banner(title, who, 'score ' + (e.team === 0 ? 'blue' : 'red'));
           } else if (!menu) BBA.Audio.play('score');
           G.arena.hype(1);
+          G.arena.cheer(e.team, e.kind === 'dunk' ? 1.5 : (e.kind === 'long' ? 1.3 : 1));
           if (!menu) {
             UI.scoreFlash(e.team);
             var line = '<b style="color:' + G.teamCss[e.team] + '">' + (e.scorer >= 0 ? esc(G._pname(e.scorer)) : C.TEAM_NAMES[e.team]) + '</b> +' + e.pts +
@@ -855,7 +856,7 @@
         case 'ballSpawn': if (!menu && sim.match.phaseT > 0.01) { G.fx.burst('pad', 0, 0.2, 0, { color: '#ffd23f' }); } break;
         case 'ballReset': if (!menu) UI.feed('Ball reset to midfield'); break;
         case 'final30': if (!menu) { UI.banner('30 SECONDS', 'Make it count!', 'warn'); BBA.Audio.play('countdown'); } break;
-        case 'tick': if (!menu) { UI.bigTick(e.n); BBA.Audio.play('tick'); } break;
+        case 'tick': if (!menu) { UI.bigTick(e.n); BBA.Audio.play('tick'); } G.arena.hype(0.12); break;
         case 'buzzer': if (!menu) { BBA.Audio.play('buzzer'); } break;
         case 'overtime':
           if (!menu) { UI.banner('OVERTIME', 'Next score wins!', 'ot'); BBA.Audio.play('overtime'); BBA.Audio.setMusic('overtime'); }
@@ -864,6 +865,7 @@
         case 'end':
           if (!menu) {
             var won = e.winner === localTeam;
+            if (e.winner >= 0) G.arena.cheer(e.winner, 2);
             UI.banner(e.winner < 0 ? 'DRAW!' : (C.TEAM_NAMES[e.winner] + ' WINS!'), (e.reason === 'mercy' ? 'MERCY RULE · ' : '') + e.score[0] + ' - ' + e.score[1], e.winner === 0 ? 'score blue' : 'score red');
             BBA.Audio.play(won ? 'victory' : 'defeat');
             BBA.Audio.setMusic('menu');
@@ -911,6 +913,8 @@
     bs.holderTeam = b.holder >= 0 ? sim.players[b.holder].team : -1;
     if (G.podium) bs.state = 'gone';
     G.ballView.update(dt, bs, G.teamCss, Arena.groundHeight);
+    // fans watch the ball (or its carrier)
+    G.arena.setFocus(bs.x, bs.z);
     G.arena.update(dt, G.mode === 'online' ? (G.renderSimTime || 0) : sim.time + G.acc, sim.settings.obstacles);
     G.arena.setScoreboard(m.score, m.clock, m.overtime, m.phase === 'ended' ? 'FINAL' : (m.overtime ? 'OVERTIME' : ''));
     G.fx.update(dt);

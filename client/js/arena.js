@@ -701,6 +701,167 @@
     }
   };
 
+  /* ---------------- crowd ----------------
+   * Mini beans with faces and arms, built as a few instanced meshes (one draw call
+   * each): bodies, eye whites, pupils, arms-down, arms-up and team signs. Fans near
+   * a team's end mostly support that team and react to its baskets; everyone
+   * watches the ball, and the stands start a wave when things go quiet. */
+  function crowdBeanGeo() {
+    var prof = [[0, 0], [0.2, 0.01], [0.29, 0.1], [0.32, 0.3], [0.31, 0.6], [0.26, 0.8], [0.15, 0.93], [0, 0.96]];
+    var pts = [];
+    for (var i = 0; i < prof.length; i++) pts.push(new THREE.Vector2(prof[i][0], prof[i][1]));
+    var geo = new THREE.LatheGeometry(pts, 9);
+    geo.computeVertexNormals();
+    return geo;
+  }
+  function mergeGeos(list) {
+    var pos = [], nor = [], i, j;
+    for (i = 0; i < list.length; i++) {
+      var gg = list[i].index ? list[i].toNonIndexed() : list[i];
+      var p = gg.attributes.position.array, n = gg.attributes.normal.array;
+      for (j = 0; j < p.length; j++) { pos.push(p[j]); nor.push(n[j]); }
+    }
+    var out = new THREE.BufferGeometry();
+    out.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    out.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+    return out;
+  }
+  function eyePair(r, y, z, sx, flat) {
+    var a = new THREE.SphereGeometry(r, 7, 5); a.scale(1, 1.2, flat); a.translate(-sx, y, z);
+    var b = new THREE.SphereGeometry(r, 7, 5); b.scale(1, 1.2, flat); b.translate(sx, y, z);
+    return mergeGeos([a, b]);
+  }
+  function armPair(up) {
+    var parts = [];
+    for (var s = -1; s <= 1; s += 2) {
+      var arm = new THREE.CylinderGeometry(0.05, 0.045, 0.3, 5);
+      var hand = new THREE.SphereGeometry(0.065, 6, 4); hand.translate(0, up ? 0.17 : -0.17, 0);
+      arm.translate(0, up ? 0.15 : -0.15, 0);
+      var m = mergeGeos([arm, hand]);
+      // shoulder pivot, then splay outward (up: a V of raised arms; down: resting at the sides)
+      m.rotateZ(up ? -0.45 * s : 0.25 * s);
+      m.translate(0.29 * s, 0.52, 0.02);
+      parts.push(m);
+    }
+    return mergeGeos(parts);
+  }
+
+  ArenaView.prototype._crowd = function (tiers) {
+    var A = this.A, g = this.group, W = A.halfW, L = A.halfL, i;
+    var count = this.mobile ? 380 : 760;
+    var seats = [];
+    // side stands (5 tiers each side), then the end stands behind the decks
+    // each tier holds two staggered rows (front and back) so the stands read as packed
+    var sideN = Math.floor(count * 0.8), lines = 2 * tiers * 2, perRow = Math.ceil(sideN / lines);
+    for (i = 0; i < sideN; i++) {
+      var side = i % 2 ? 1 : -1, ln = Math.floor(i / 2) % (tiers * 2), tier = ln >> 1, back = ln & 1, slot = Math.floor(i / lines);
+      var z = -L - 2 + (slot + 0.5 + back * 0.5) * ((L * 2 + 4) / perRow);
+      seats.push({ x: side * (W + 2.2 + tier * 2.2 + (back ? 0.45 : -0.45)) + (Math.random() - 0.5) * 0.15, y: 1 + tier * 1.6, z: z + (Math.random() - 0.5) * 0.25 });
+    }
+    var endN = count - sideN, perEnd = Math.ceil(endN / 6);
+    for (i = 0; i < endN; i++) {
+      var e = i % 2 ? 1 : -1, row = Math.floor(i / 2) % 3, sl = Math.floor(i / 6);
+      seats.push({ x: -W - 8 + (sl + 0.5) * ((W * 2 + 16) / perEnd), y: 8 + row * 2, z: e * (L + 1.8 + row * 2.4) });
+    }
+    count = seats.length;
+
+    var tc = this.teamCss, neutral = ['#ffd23f', '#ff7a2f', '#ff4f8b', '#b86bff', '#2fd3c4', '#6fdc4a', '#ffffff', '#ff9ec8', '#8be0ff', '#c58a52'];
+    var bodyM = new THREE.MeshLambertMaterial({ color: '#ffffff' });
+    var mk = function (geo, mat, n) { var m = new THREE.InstancedMesh(geo, mat, n); m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.frustumCulled = false; g.add(m); return m; };
+    var C = this.crowdV = {
+      body: mk(crowdBeanGeo(), bodyM, count),
+      eyes: mk(eyePair(0.07, 0.7, 0.27, 0.09, 0.6), new THREE.MeshBasicMaterial({ color: '#ffffff' }), count),
+      pupils: mk(eyePair(0.035, 0.71, 0.312, 0.09, 0.5), new THREE.MeshBasicMaterial({ color: '#141418' }), count),
+      armsDown: mk(armPair(false), bodyM, count),
+      armsUp: mk(armPair(true), bodyM, count),
+      fans: []
+    };
+    var signGeo = new THREE.BoxGeometry(0.62, 0.36, 0.04); signGeo.translate(0, 1.32, 0.05);
+    var stick = new THREE.CylinderGeometry(0.02, 0.02, 0.4, 4); stick.translate(0, 1.0, 0.05);
+    var signN = 0, col = new THREE.Color();
+    for (i = 0; i < count; i++) {
+      var st = seats[i];
+      // allegiance: fans near a team's end of the stands mostly support that team (team 0 defends -z)
+      var nz = st.z / (L + 8), r = Math.random(), team = -1;
+      var p0 = 0.5 - nz * 0.45;
+      if (r < 0.72) team = Math.random() < p0 ? 0 : 1;
+      var c = team >= 0 && Math.random() < 0.8 ? tc[team] : neutral[(i * 7 + (i >> 3)) % neutral.length];
+      col.set(c);
+      C.body.setColorAt(i, col); C.armsDown.setColorAt(i, col); C.armsUp.setColorAt(i, col);
+      var sc = 1.0 + Math.random() * 0.3;
+      C.fans.push({ x: st.x, y: st.y, z: st.z, s: sc, team: team, ph: Math.random() * 6.28, sp: 5 + Math.random() * 4,
+        ang: Math.atan2(st.z, st.x), exc: 0, sad: 0, yaw: 0, sign: team >= 0 && Math.random() < 0.13 ? signN++ : -1 });
+    }
+    // team signs (only some fans carry one)
+    C.signs = mk(mergeGeos([signGeo, stick]), new THREE.MeshLambertMaterial({ color: '#ffffff' }), Math.max(1, signN));
+    for (i = 0; i < count; i++) { var f = C.fans[i]; if (f.sign >= 0) { col.set(tc[f.team]); C.signs.setColorAt(f.sign, col); } }
+    ['body', 'armsDown', 'armsUp', 'signs'].forEach(function (k) { if (C[k].instanceColor) C[k].instanceColor.needsUpdate = true; });
+    this.crowdHype = 0.2;
+    this.teamCheer = [0, 0];
+    this.waveT = -1; this.waveCd = 18 + Math.random() * 10;
+    this.focusX = 0; this.focusZ = 0;
+    this._updateCrowd(0, 0);
+  };
+
+  /* Team-specific reaction: team's fans cheer (amt ~1 basket, ~1.5 dunk), the other side slumps. */
+  ArenaView.prototype.cheer = function (team, amt) {
+    if (!this.crowdV) return;
+    this.teamCheer[team] = Math.min(2, this.teamCheer[team] + amt);
+    var f = this.crowdV.fans;
+    for (var i = 0; i < f.length; i++) {
+      if (f[i].team === team) f[i].exc = Math.max(f[i].exc, amt * (0.8 + Math.random() * 0.4));
+      else if (f[i].team === 1 - team) f[i].sad = Math.max(f[i].sad, Math.min(1, amt * 0.8));
+    }
+    this.waveT = -1;
+  };
+  ArenaView.prototype.setFocus = function (x, z) { this.focusX = x; this.focusZ = z; };
+
+  ArenaView.prototype._updateCrowd = function (dt, t) {
+    var C = this.crowdV; if (!C) return;
+    this.crowdHype = Math.max(0.2, this.crowdHype - dt * 0.25);
+    // quiet for a while -> someone starts a wave (goes once around the stadium)
+    if (this.waveT >= 0) { this.waveT += dt; if (this.waveT > 7) { this.waveT = -1; this.waveCd = 25 + Math.random() * 20; } }
+    else if (this.crowdHype < 0.35) { this.waveCd -= dt; if (this.waveCd <= 0) this.waveT = 0; }
+    var waveAng = this.waveT >= 0 ? -Math.PI + (this.waveT / 7) * Math.PI * 2.6 : 99;
+    // phones update the fans every other frame (carrying the skipped frame's time over)
+    this.crowdFrame = (this.crowdFrame || 0) + 1;
+    this._crowdDt = (this._crowdDt || 0) + dt;
+    if (this.mobile && this.crowdFrame % 2 && dt > 0) return;
+    dt = this._crowdDt; this._crowdDt = 0;
+    var d = this._dummy || (this._dummy = new THREE.Object3D()), hide = this._hideM || (this._hideM = new THREE.Matrix4().makeScale(0, 0, 0));
+    var hy = this.crowdHype, fx = this.focusX, fz = this.focusZ, f, i, kd = Math.min(1, dt * 4);
+    for (i = 0; i < C.fans.length; i++) {
+      f = C.fans[i];
+      f.exc = Math.max(0, f.exc - dt * 0.45); f.sad = Math.max(0, f.sad - dt * 0.35);
+      // the wave: a band sweeping around the stadium by angle
+      var wv = 0;
+      if (waveAng < 50) { var da = Math.abs(((f.ang - waveAng) % 6.283 + 9.425) % 6.283 - 3.1416); wv = da < 0.35 ? 1 - da / 0.35 : 0; }
+      var excite = Math.min(1.5, f.exc + hy * 0.35 + wv);
+      var jump = Math.max(0, Math.sin(t * f.sp + f.ph)) * 0.42 * Math.max(0, excite - f.sad * 0.8);
+      if (wv > 0) jump = Math.max(jump, wv * 0.55);
+      var sink = f.sad * 0.08;
+      // watch the ball (smoothly), slump forward when sad
+      var want = Math.atan2(fx - f.x, fz - f.z);
+      var dy = want - f.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+      f.yaw += dy * kd;
+      d.position.set(f.x, f.y + jump - sink, f.z);
+      d.rotation.set(f.sad * 0.35, f.yaw, Math.sin(t * 1.3 + f.ph) * 0.04, 'YXZ');
+      d.scale.set(f.s, f.s * (1 - f.sad * 0.06), f.s);
+      d.updateMatrix();
+      C.body.setMatrixAt(i, d.matrix); C.eyes.setMatrixAt(i, d.matrix); C.pupils.setMatrixAt(i, d.matrix);
+      var armsUp = excite > 0.55 && f.sad < 0.3;
+      C.armsUp.setMatrixAt(i, armsUp ? d.matrix : hide);
+      C.armsDown.setMatrixAt(i, armsUp ? hide : d.matrix);
+      if (f.sign >= 0) {
+        // signs wave side to side while cheering
+        if (excite > 0.4) { d.rotation.z += Math.sin(t * 7 + f.ph) * 0.3; d.updateMatrix(); }
+        C.signs.setMatrixAt(f.sign, f.sad > 0.5 ? hide : d.matrix);
+      }
+    }
+    C.body.instanceMatrix.needsUpdate = true; C.eyes.instanceMatrix.needsUpdate = true; C.pupils.instanceMatrix.needsUpdate = true;
+    C.armsUp.instanceMatrix.needsUpdate = true; C.armsDown.instanceMatrix.needsUpdate = true; C.signs.instanceMatrix.needsUpdate = true;
+  };
+
   /* ---------------- stands & crowd ---------------- */
   ArenaView.prototype._stands = function () {
     var A = this.A, TH = this.TH;
@@ -727,36 +888,7 @@
         g.add(eb);
       }
     }
-    // crowd (instanced beans)
-    var count = this.mobile ? 220 : 420;
-    var geo = new THREE.SphereGeometry(0.34, 7, 6); geo.scale(1, 1.35, 1);
-    var cm = new THREE.MeshLambertMaterial({ color: '#ffffff' });
-    var inst = new THREE.InstancedMesh(geo, cm, count);
-    var palette = ['#ffd23f', '#ff7a2f', '#ff4f8b', '#b86bff', '#5b8cff', '#2fd3c4', '#6fdc4a', '#ffffff', '#ff9ec8', '#8be0ff', this.teamCss[0], this.teamCss[1]];
-    var dummy = new THREE.Object3D(), col = new THREE.Color();
-    this.crowd = [];
-    for (i = 0; i < count; i++) {
-      var side, x, y, z;
-      if (i < count * 0.8) {
-        side = i % 2 ? 1 : -1;
-        var tier = (Math.floor(i / 2) % tiers);
-        x = side * (W + 2.2 + tier * 2.2); y = 1 + tier * 1.6 + 0.55;
-        z = -L + ((Math.floor(i / (2 * tiers)) * 1.35) % (L * 2)) + (tier % 2) * 0.6;
-      } else {
-        var k = i - Math.floor(count * 0.8), e2 = k % 2 ? 1 : -1, row = Math.floor(k / 2) % 3;
-        x = -W - 8 + ((Math.floor(k / 6) * 1.4) % (W * 2 + 16)); y = 8 + row * 2 + 0.55; z = e2 * (L + 1.8 + row * 2.4);
-      }
-      dummy.position.set(x, y, z); dummy.updateMatrix();
-      inst.setMatrixAt(i, dummy.matrix);
-      col.set(palette[(i * 7 + (i >> 3)) % palette.length]);
-      inst.setColorAt(i, col);
-      this.crowd.push({ x: x, y: y, z: z, ph: Math.random() * 6.28, sp: 4 + Math.random() * 4 });
-    }
-    inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
-    g.add(inst);
-    this.crowdMesh = inst;
-    this.crowdHype = 0.2;
+    this._crowd(tiers);
     // jumbotrons
     this.screens = [];
     for (e = -1; e <= 1; e += 2) {
@@ -1010,22 +1142,7 @@
         n.m.color.copy(base).multiplyScalar(k);
       } else n.m.color.copy(base);
     }
-    // crowd bob
-    this.crowdHype = Math.max(0.2, this.crowdHype - dt * 0.25);
-    this.crowdFrame = (this.crowdFrame || 0) + 1;
-    if (!this.mobile || this.crowdFrame % 2 === 0) {
-      var dummy = this._dummy || (this._dummy = new THREE.Object3D());
-      var hy = this.crowdHype;
-      for (i = 0; i < this.crowd.length; i++) {
-        var c = this.crowd[i];
-        var j = Math.max(0, Math.sin(t * c.sp + c.ph)) * 0.35 * hy;
-        dummy.position.set(c.x, c.y + j, c.z);
-        dummy.rotation.y = c.x > 0 ? -Math.PI / 2 : Math.PI / 2;
-        dummy.updateMatrix();
-        this.crowdMesh.setMatrixAt(i, dummy.matrix);
-      }
-      this.crowdMesh.instanceMatrix.needsUpdate = true;
-    }
+    this._updateCrowd(dt, t);
   };
 
   ArenaView.prototype.dispose = function () {
