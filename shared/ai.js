@@ -127,6 +127,17 @@
   };
 
   AI.prototype.removeBot = function (pid) { delete this.brains[pid]; };
+
+  /* How hard a bot commits to tackles / steals / interceptions right now (0..1).
+   * Party-game feel: bots hold back against human players (per difficulty) and
+   * relax when their team is comfortably ahead, so matches stay close and fun. */
+  AI.prototype._ease = function (br, p, vsPid) {
+    var sim = this.sim, k = 1, o = vsPid >= 0 ? sim.players[vsPid] : null;
+    if (o && !o.isBot) k *= 1 - (br.diff.humanEase || 0);
+    var sc = sim.match.score, lead = sc[p.team] - sc[1 - p.team];
+    if (lead >= 6) k *= 0.6; else if (lead >= 3) k *= 0.8;
+    return k;
+  };
   AI.prototype.isBot = function (pid) { return !!this.brains[pid]; };
 
   AI.prototype.update = function (dt) {
@@ -645,10 +656,11 @@
     br.look = Math.atan2(dx, dz);
     this._setTarget(br, tx, tz, true, 0.2);
     if (c.state === 'dunk') return;
+    var ease = this._ease(br, p, c.id);
     if (d < 1.8 && p.grabTarget < 0 && p.grabCd <= 0 && br.holdGrab <= 0) {
-      if (rng() < 0.55 + br.diff.aggression * 0.4) { br.holdGrab = 1.2; }
+      if (rng() < (0.25 + br.diff.aggression * 0.5) * ease) { br.holdGrab = 1.2; }
     } else if (d > 2.0 && d < 5.2 && p.diveCd <= 0 && c.stunImmune <= 0 && p.grounded) {
-      var chance = 0.18 * br.diff.aggression * br.pers.tackle;
+      var chance = 0.18 * br.diff.aggression * br.pers.tackle * ease;
       if (!c.grounded && d < 4) chance *= 2.5; // stop a dunk attempt
       if (rng() < chance) {
         var ld = d / 14;
@@ -674,13 +686,14 @@
       var d = hyp(threat.x - p.x, threat.z - p.z);
       var tdh = hyp(threat.x - own.x, threat.z - own.z);
       if (tdh < 7.5) { tx = threat.x + threat.vx * 0.2; tz = threat.z + threat.vz * 0.2; }
-      if (!threat.grounded && d < 3 && p.grounded && rng() < br.diff.block) this._pulse(br, 'jump');
-      if (tdh < 9 && d > 1.8 && d < 4.5 && p.diveCd <= 0 && threat.stunImmune <= 0 && rng() < 0.2 * br.diff.aggression * br.pers.tackle) {
+      var ease = this._ease(br, p, threat.id);
+      if (!threat.grounded && d < 3 && p.grounded && rng() < br.diff.block * ease) this._pulse(br, 'jump');
+      if (tdh < 9 && d > 1.8 && d < 4.5 && p.diveCd <= 0 && threat.stunImmune <= 0 && rng() < 0.2 * br.diff.aggression * br.pers.tackle * ease) {
         var ax = threat.x - p.x, az = threat.z - p.z, al = hyp(ax, az) || 1;
         br.input.mx = ax / al; br.input.mz = az / al; br.path = null;
         this._pulse(br, 'dive');
       }
-      if (d < 1.8 && br.holdGrab <= 0 && p.grabCd <= 0 && rng() < 0.5) br.holdGrab = 1.2;
+      if (d < 1.8 && br.holdGrab <= 0 && p.grabCd <= 0 && rng() < 0.4 * ease) br.holdGrab = 1.2;
     } else {
       this._intercept(br, p);
     }
@@ -710,7 +723,7 @@
   AI.prototype._intercept = function (br, p) {
     var sim = this.sim, b = sim.ball, pr = this.pred, i;
     if (b.state !== 'free' || !b.inFlight || !b.lastThrow || b.lastThrow.team === p.team || !pr) return false;
-    if (sim.rng() > br.diff.intercept) return false;
+    if (sim.rng() > br.diff.intercept * this._ease(br, p, b.lastThrow.by)) return false;
     for (i = 0; i < pr.length; i++) {
       var q = pr[i];
       if (q.y > 3.2) continue;

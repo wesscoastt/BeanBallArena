@@ -35,20 +35,23 @@
   };
 
   R.DIFFICULTY = {
+    // Tuned to feel like a casual party game (Crown Jam style): bots should be
+    // beatable by new players, with Hard kept for people who want a fight.
+    // humanEase: how much bots hold back on tackles/steals against a HUMAN carrier (0 = none)
     easy: {
-      react: 0.42, shotErr: 0.2, yawErr: 0.12, passErr: 1.0,
-      aggression: 0.35, block: 0.2, intercept: 0.3, sprintUse: 0.5,
-      dodge: 0.1, passSense: 0.4, shotRangeMul: 0.8, callPass: 0.75
+      react: 0.55, shotErr: 0.24, yawErr: 0.14, passErr: 1.2,
+      aggression: 0.2, block: 0.1, intercept: 0.12, sprintUse: 0.4,
+      dodge: 0.08, passSense: 0.35, shotRangeMul: 0.8, callPass: 0.8, humanEase: 0.5
     },
     normal: {
-      react: 0.24, shotErr: 0.12, yawErr: 0.06, passErr: 0.45,
-      aggression: 0.65, block: 0.5, intercept: 0.6, sprintUse: 0.8,
-      dodge: 0.3, passSense: 0.7, shotRangeMul: 1, callPass: 0.6
+      react: 0.34, shotErr: 0.15, yawErr: 0.08, passErr: 0.6,
+      aggression: 0.42, block: 0.3, intercept: 0.32, sprintUse: 0.65,
+      dodge: 0.22, passSense: 0.6, shotRangeMul: 0.95, callPass: 0.65, humanEase: 0.3
     },
     hard: {
       react: 0.11, shotErr: 0.065, yawErr: 0.025, passErr: 0.15,
       aggression: 0.9, block: 0.85, intercept: 0.9, sprintUse: 1,
-      dodge: 0.55, passSense: 0.95, shotRangeMul: 1.1, callPass: 0.5
+      dodge: 0.55, passSense: 0.95, shotRangeMul: 1.1, callPass: 0.5, humanEase: 0
     }
   };
 
