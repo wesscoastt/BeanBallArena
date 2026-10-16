@@ -44,15 +44,24 @@
       dodge: 0.08, passSense: 0.35, shotRangeMul: 0.8, callPass: 0.8, humanEase: 0.5
     },
     normal: {
-      react: 0.34, shotErr: 0.15, yawErr: 0.08, passErr: 0.6,
-      aggression: 0.42, block: 0.3, intercept: 0.32, sprintUse: 0.65,
-      dodge: 0.22, passSense: 0.6, shotRangeMul: 0.95, callPass: 0.65, humanEase: 0.3
+      react: 0.4, shotErr: 0.17, yawErr: 0.09, passErr: 0.7,
+      aggression: 0.36, block: 0.25, intercept: 0.26, sprintUse: 0.6,
+      dodge: 0.2, passSense: 0.55, shotRangeMul: 0.95, callPass: 0.65, humanEase: 0.35
     },
     hard: {
       react: 0.11, shotErr: 0.065, yawErr: 0.025, passErr: 0.15,
       aggression: 0.9, block: 0.85, intercept: 0.9, sprintUse: 1,
       dodge: 0.55, passSense: 0.95, shotRangeMul: 1.1, callPass: 0.5, humanEase: 0
     }
+  };
+
+  /* Humanlike lobbies: each bot rolls its own skill around the chosen difficulty,
+   * and now and then one bot in a match is a "sweat" who plays a level up.
+   * sweatChance: per match; sweatAs: the difficulty that sweat plays at. */
+  R.LOBBY = {
+    easy:   { spread: 0.25, sweatChance: 0.15, sweatAs: 'normal' },
+    normal: { spread: 0.25, sweatChance: 0.25, sweatAs: 'hard' },
+    hard:   { spread: 0.1,  sweatChance: 0,    sweatAs: 'hard' }
   };
 
   // Personality tendencies: multipliers on decisions

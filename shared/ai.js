@@ -105,13 +105,31 @@
   AI.segWalkable = segWalkable;
   AI.route = route;
 
+  /* A bot's own skill: the difficulty's numbers nudged by k (k > 1 = better).
+   * "Good" knobs scale up with k, reaction time and errors scale down. */
+  function skillProfile(base, k) {
+    var d = {}, key;
+    for (key in base) if (base.hasOwnProperty(key)) d[key] = base[key];
+    ['aggression', 'block', 'intercept', 'sprintUse', 'dodge', 'passSense'].forEach(function (q) { d[q] = clamp(base[q] * k, 0, 1); });
+    ['react', 'shotErr', 'yawErr', 'passErr'].forEach(function (q) { d[q] = base[q] / k; });
+    return d;
+  }
+
   AI.prototype.addBot = function (pid, difficulty, personality) {
     var sim = this.sim;
     var pers = personality || Rules.PERSONALITY_LIST[Math.floor(sim.rng() * Rules.PERSONALITY_LIST.length)];
+    var dn = Rules.DIFFICULTY[difficulty] ? difficulty : 'normal', lob = Rules.LOBBY[dn];
+    // once per match: is there a sweat in this lobby, and which bot (by join order)?
+    if (this._sweatAt === undefined) this._sweatAt = sim.rng() < lob.sweatChance ? Math.floor(sim.rng() * 4) : -1;
+    this._botCount = (this._botCount || 0) + 1;
+    var sweat = this._botCount - 1 === this._sweatAt;
+    var diff = sweat ? skillProfile(Rules.DIFFICULTY[lob.sweatAs], 1)
+      : skillProfile(Rules.DIFFICULTY[dn], 1 + (sim.rng() * 2 - 1) * lob.spread);
+    if (sweat) diff.humanEase = 0;
     this.brains[pid] = {
       pid: pid,
-      diffName: difficulty || 'normal',
-      diff: Rules.DIFFICULTY[difficulty] || Rules.DIFFICULTY.normal,
+      diffName: dn, sweat: sweat,
+      diff: diff,
       persName: pers,
       pers: Rules.PERSONALITIES[pers] || Rules.PERSONALITIES.playmaker,
       role: 'support', decideT: sim.rng() * 0.3,
@@ -324,8 +342,16 @@
     br.decideT -= dt;
     var decide = false;
     if (br.decideT <= 0) { br.decideT = br.diff.react * (0.75 + sim.rng() * 0.5); decide = true; }
-
     var hasBall = sim.ball.holder === p.id;
+    // human moments (not the sweat): sometimes a player just hesitates a beat and keeps
+    // doing what they were doing, or hops around for no reason
+    if (!br.sweat && br.diffName !== 'hard') {
+      if (decide && !hasBall && br.role !== 'carrier' && sim.rng() < 0.05) { decide = false; br.decideT = 0.45 + sim.rng() * 0.5; }
+      if (!hasBall && p.grounded && sim.rng() < 0.0025) {
+        var bb = sim.ball;
+        if (hyp(bb.x - p.x, bb.z - p.z) > 10) this._pulse(br, 'jump');
+      }
+    }
     if (hasBall && br.role !== 'carrier') br.role = 'carrier';
     if (!hasBall && br.role === 'carrier') br.role = 'support';
 
