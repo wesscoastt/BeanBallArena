@@ -6,7 +6,8 @@
 (function (root) {
   var BBA = root.BBA = root.BBA || {};
   var THREE = root.THREE;
-  var A = BBA.Arena;
+  // always the CURRENT arena (BBA.Arena changes when a match loads a different map)
+  function Ar() { return BBA.Arena; }
 
   function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
   function wrap(a) { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; }
@@ -121,15 +122,15 @@
     for (i = 1; i <= steps; i++) {
       var dd = dist * i / steps;
       var px = tx - fx * cp * dd, pz = tz - fz * cp * dd, py = ty + spt * dd;
-      var gh = A.groundHeight(px, pz);
+      var gh = Ar().groundHeight(px, pz);
       if (py < gh + 0.45) { best = Math.max(1.4, dd - dist / steps); break; }
     }
     dist = best;
     var cx = tx - fx * cp * dist, cz = tz - fz * cp * dist, cy = ty + spt * dist;
     // stay inside the stadium glass
-    var W = A.halfW + 3, L = A.halfL + 2;
+    var W = Ar().halfW + 3, L = Ar().halfL + 2;
     cx = clamp(cx, -W, W); cz = clamp(cz, -L, L);
-    var g2 = A.groundHeight(cx, cz);
+    var g2 = Ar().groundHeight(cx, cz);
     if (cy < g2 + 0.5) cy = g2 + 0.5;
     this.pos.set(cx, cy, cz);
     this.cam.position.copy(this.pos);

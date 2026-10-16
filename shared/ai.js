@@ -232,7 +232,10 @@
         for (i = 0; i < others.length; i++) {
           var br0 = this.brains[others[i].id];
           if (b.passTarget === others[i].id) { setRole(others[i], 'receive'); continue; }
-          if (i >= 1 && (mates.length >= 3) && (br0.persName === 'defender' || i >= 2)) setRole(others[i], 'safety');
+          if (mates.length >= 4) {
+            // bigger teams: exactly one safety (the one furthest back), everyone else attacks
+            setRole(others[i], i === others.length - 1 ? 'safety' : 'support');
+          } else if (i >= 1 && (mates.length >= 3) && (br0.persName === 'defender' || i >= 2)) setRole(others[i], 'safety');
           else setRole(others[i], 'support');
         }
       } else if (holder) {
@@ -245,7 +248,14 @@
         var start = 0;
         if (!humanPressing || sorted.length >= 2) { setRole(sorted[0], 'pressure'); start = 1; }
         var rest = sorted.slice(start).sort(function (a, c) { return hyp(a.x - own.x, a.z - own.z) - hyp(c.x - own.x, c.z - own.z); });
-        for (i = 0; i < rest.length; i++) setRole(rest[i], i === 0 ? 'defend' : 'mark');
+        // markers each take a different attacker (most dangerous = closest to our hoop first)
+        var threats = this._opponents(team).filter(function (o) { return o.id !== holder.id && !o.hidden; })
+          .sort(function (a, c) { return hyp(a.x - own.x, a.z - own.z) - hyp(c.x - own.x, c.z - own.z); });
+        var ti = 0;
+        for (i = 0; i < rest.length; i++) {
+          setRole(rest[i], i === 0 ? 'defend' : 'mark');
+          if (i > 0) this.brains[rest[i].id].markId = threats.length ? threats[ti++ % threats.length].id : -1;
+        }
       } else {
         // loose ball (or ball in flight / respawning)
         var L = this._landing();
@@ -281,6 +291,7 @@
           var rb = remaining[i];
           if (i === 0 && inOwnHalf) setRole(rb, 'defend');
           else if (i === 0) setRole(rb, 'support');
+          else if (mates.length >= 4) setRole(rb, (!inOwnHalf && i === remaining.length - 1) ? 'safety' : 'support');  // big teams: one safety
           else setRole(rb, inOwnHalf ? 'support' : 'safety');
         }
       }
@@ -703,7 +714,9 @@
   AI.prototype._mark = function (br, p) {
     var sim = this.sim, own = sim.ownHoop(p.team), bp = this._ballPos(), b = sim.ball;
     var opp = this._opponents(p.team), best = null, bd = 1e9, i;
-    for (i = 0; i < opp.length; i++) {
+    var assigned = br.markId >= 0 ? sim.players[br.markId] : null;
+    if (assigned && assigned.team !== p.team && !assigned.hidden && assigned.id !== b.holder) best = assigned;
+    for (i = 0; !best && i < opp.length; i++) {
       var o = opp[i];
       if (o.id === b.holder) continue;
       var d = hyp(o.x - own.x, o.z - own.z) + hyp(o.x - p.x, o.z - p.z) * 0.5;

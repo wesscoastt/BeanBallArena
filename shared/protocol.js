@@ -103,6 +103,6 @@
   return {
     EV: EV, BITS: BITS, packInput: packInput, unpackInput: unpackInput, roomCode: roomCode, SNAPSHOT_HZ: 20,
     P_FIELDS: P_FIELDS, encodePlayer: encodePlayer, decodePlayer: decodePlayer, encodeSnapshot: encodeSnapshot,
-    decodeMatch: decodeMatch, decodeBall: decodeBall, MAX_HUMANS: 6, RECONNECT_SECONDS: 45
+    decodeMatch: decodeMatch, decodeBall: decodeBall, MAX_HUMANS: 10, RECONNECT_SECONDS: 45
   };
 });

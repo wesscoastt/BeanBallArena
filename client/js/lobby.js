@@ -70,7 +70,7 @@
 
   var SETTINGS = [
     ['arena', 'ARENA', BBA.Arenas.list.map(function (a) { return [a.id, a.name]; })],
-    ['teamSize', 'TEAM SIZE', [[1, '1 v 1'], [2, '2 v 2'], [3, '3 v 3']]],
+    ['teamSize', 'TEAM SIZE', [[1, '1 v 1'], [2, '2 v 2'], [3, '3 v 3'], [4, '4 v 4 (big courts)'], [5, '5 v 5 (big courts)']]],
     ['duration', 'MATCH LENGTH', [[180, '3 min'], [240, '4 min'], [300, '5 min'], [420, '7 min']]],
     ['warmup', 'WARM-UP', [[0, 'Off'], [30, '30 s'], [60, '60 s'], [120, '2 min'], [-1, 'Until all ready']]],
     ['scoreLimit', 'SCORE LIMIT', [[0, 'None'], [10, '10'], [15, '15'], [21, '21']]],

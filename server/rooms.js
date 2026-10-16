@@ -5,6 +5,8 @@
 var Rules = require('../shared/gameRules.js');
 var Protocol = require('../shared/protocol.js');
 var Match = require('./match.js');
+var Arenas = require('../shared/arenaDef.js');
+function arenaMax(id) { return Arenas.get(id).maxTeam || 3; }
 
 var LOBBY_GRACE = 20;                      // seconds a disconnected lobby member keeps their seat
 var MATCH_GRACE = Protocol.RECONNECT_SECONDS;
@@ -12,7 +14,7 @@ var MATCH_GRACE = Protocol.RECONNECT_SECONDS;
 var DEFAULT_SETTINGS = Rules.merge(Rules.DEFAULTS, { autoFillBots: true, warmup: 60 });
 
 var LIMITS = {
-  teamSize: [1, 3, 'int'], duration: [60, 600, 'int'], scoreLimit: [0, 99, 'int'], mercyLead: [0, 50, 'int'], tackleStrength: [0.3, 2, 'num'],
+  teamSize: [1, 5, 'int'], duration: [60, 600, 'int'], scoreLimit: [0, 99, 'int'], mercyLead: [0, 50, 'int'], tackleStrength: [0.3, 2, 'num'],
   ballWeight: [0.5, 2, 'num'], gravity: [0.4, 1.6, 'num'], jumpHeight: [0.6, 1.8, 'num'], respawnTime: [0.5, 8, 'num'], obstacles: [0, 2.5, 'num'], warmup: [-1, 180, 'int']
 };
 var CHOICES = {
@@ -104,12 +106,13 @@ Room.prototype.broadcastLobby = function () {
 };
 
 Room.prototype.addMember = function (socket, name, cosmetics, token) {
-  if (this.members.length >= Protocol.MAX_HUMANS) return { error: 'Room is full (6 players max).' };
+  var cap = Math.min(Protocol.MAX_HUMANS, arenaMax(this.settings.arena) * 2);
+  if (this.members.length >= cap) return { error: 'Room is full (' + cap + ' players max on this arena).' };
   var size = this.settings.teamSize;
   var t0 = this.humansOn(0), t1 = this.humansOn(1), team;
   if (t0 < size && (t0 <= t1 || t1 >= size)) team = 0;
   else if (t1 < size) team = 1;
-  else if (size < 3) { this.settings.teamSize = size + 1; team = t0 <= t1 ? 0 : 1; }
+  else if (size < arenaMax(this.settings.arena)) { this.settings.teamSize = size + 1; team = t0 <= t1 ? 0 : 1; }
   else return { error: 'Both teams are full.' };
   // a new human takes a bot's seat if needed
   if (this.humansOn(team) + this.bots[team].length >= this.settings.teamSize) this.bots[team].pop();
@@ -182,7 +185,8 @@ Room.prototype.onReconnect = function (socket, m) {
 Room.prototype.setSettings = function (patch) {
   var s = this.settings, k;
   if (!patch || typeof patch !== 'object') return;
-  if (patch.restoreDefaults) { this.settings = Rules.merge(DEFAULT_SETTINGS, {}); this.trimBots(); return; }
+  var prevArena = s.arena;
+  if (patch.restoreDefaults) { this.settings = Rules.merge(DEFAULT_SETTINGS, {}); this._fitArena(prevArena); this.trimBots(); return; }
   for (k in patch) {
     if (!patch.hasOwnProperty(k)) continue;
     if (LIMITS[k]) {
@@ -196,7 +200,17 @@ Room.prototype.setSettings = function (patch) {
       s[k] = patch[k];
     }
   }
+  this._fitArena(prevArena);
   this.trimBots();
+};
+
+/* Team size must fit the arena (big courts allow 5v5, classic ones 3v3). If the
+ * humans already in the room don't fit the new arena, keep the previous one. */
+Room.prototype._fitArena = function (prevArena) {
+  var s = this.settings, need = Math.max(this.humansOn(0), this.humansOn(1));
+  if (need > arenaMax(s.arena)) s.arena = prevArena;
+  var mt = arenaMax(s.arena);
+  s.teamSize = Math.max(need, Math.min(s.teamSize, mt), 1);
 };
 
 Room.prototype.trimBots = function () {

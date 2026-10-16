@@ -118,32 +118,40 @@
     var A = this.A, TH = this.TH;
     // phones: half-size court texture (less GPU memory = fewer lost-context black screens)
     var W = this.mobile ? 512 : 1024, H = this.mobile ? 1024 : 2048, cv = canvas(W, H), c = cv.getContext('2d');
-    var sx = W / 40, sz = H / 68;
+    var HW = A.halfW, HL = A.halfL, W2 = HW * 2, L2 = HL * 2;
+    var sx = W / W2, sz = H / L2;
     c.setTransform(sx, 0, 0, sz, W / 2, H / 2);
     // base
-    var grd = c.createLinearGradient(0, -34, 0, 34);
+    var grd = c.createLinearGradient(0, -HL, 0, HL);
     var F = TH.floor || ['#5572ff', '#f28d3c', '#ffa04a', '#ff5470'];
     grd.addColorStop(0, F[0]); grd.addColorStop(0.3, F[1]);
     grd.addColorStop(0.5, F[2]); grd.addColorStop(0.7, F[1]); grd.addColorStop(1, F[3]);
-    c.fillStyle = grd; c.fillRect(-20, -34, 40, 68);
+    c.fillStyle = grd; c.fillRect(-HW, -HL, W2, L2);
     // tiles
     var x, z;
-    for (x = -20; x < 20; x += 2) for (z = -34; z < 34; z += 2) {
+    for (x = -HW; x < HW; x += 2) for (z = -HL; z < HL; z += 2) {
       if (((x + z) / 2) % 2 === 0) { c.fillStyle = TH.tile || 'rgba(255,255,255,0.07)'; c.fillRect(x, z, 2, 2); }
     }
     if (TH.planks) {
       // wooden deck planks
       c.strokeStyle = 'rgba(90,50,20,0.35)'; c.lineWidth = 0.05;
-      for (x = -20; x <= 20; x += 0.8) { c.beginPath(); c.moveTo(x, -34); c.lineTo(x, 34); c.stroke(); }
-      for (x = -20; x < 20; x += 0.8) for (z = -34 + ((x * 7) % 3 + 3) % 3; z < 34; z += 3.2) { c.beginPath(); c.moveTo(x, z); c.lineTo(x + 0.8, z); c.stroke(); }
+      for (x = -HW; x <= HW; x += 0.8) { c.beginPath(); c.moveTo(x, -HL); c.lineTo(x, HL); c.stroke(); }
+      for (x = -HW; x < HW; x += 0.8) for (z = -HL + ((x * 7) % 3 + 3) % 3; z < HL; z += 3.2) { c.beginPath(); c.moveTo(x, z); c.lineTo(x + 0.8, z); c.stroke(); }
     } else {
       c.strokeStyle = TH.grid ? hexA(TH.grid, 0.35) : 'rgba(80,40,90,0.14)'; c.lineWidth = TH.grid ? 0.08 : 0.06;
-      for (x = -20; x <= 20; x += 2) { c.beginPath(); c.moveTo(x, -34); c.lineTo(x, 34); c.stroke(); }
-      for (z = -34; z <= 34; z += 2) { c.beginPath(); c.moveTo(-20, z); c.lineTo(20, z); c.stroke(); }
+      for (x = -HW; x <= HW; x += 2) { c.beginPath(); c.moveTo(x, -HL); c.lineTo(x, HL); c.stroke(); }
+      for (z = -HL; z <= HL; z += 2) { c.beginPath(); c.moveTo(-HW, z); c.lineTo(HW, z); c.stroke(); }
+    }
+    if (TH.halftone) {
+      // comic-book halftone dots, denser toward the sidelines
+      for (x = -HW + 0.6; x < HW; x += 1.2) for (z = -HL + 0.6; z < HL; z += 1.2) {
+        var hr = 0.08 + 0.22 * Math.min(1, Math.abs(x) / HW);
+        c.fillStyle = 'rgba(20,10,40,0.10)'; c.beginPath(); c.arc(x, z, hr, 0, 6.283); c.fill();
+      }
     }
     if (TH.snow) {
       c.fillStyle = 'rgba(255,255,255,0.6)';
-      for (var sn = 0; sn < 900; sn++) { c.fillRect((sn * 37.13 % 40) - 20, (sn * 91.7 % 68) - 34, 0.12, 0.12); }
+      for (var sn = 0; sn < 900; sn++) { c.fillRect((sn * 37.13 % W2) - HW, (sn * 91.7 % L2) - HL, 0.12, 0.12); }
     }
     // ice patches
     for (var ii = 0; ii < A.ice.length; ii++) {
@@ -157,11 +165,11 @@
     for (var t = 0; t < 2; t++) {
       var hz = A.hoops[t].z, sgn = hz > 0 ? -1 : 1;
       c.fillStyle = hexA(tc[t], 0.28);
-      c.beginPath(); c.arc(0, hz, 12, 0, Math.PI * 2); c.fill();
+      c.beginPath(); c.arc(0, hz, A.hoops[t].threeDist, 0, Math.PI * 2); c.fill();
       c.fillStyle = hexA(tc[t], 0.45);
       c.fillRect(-3.2, Math.min(hz, hz + sgn * 7), 6.4, 7);
       c.strokeStyle = '#ffffff'; c.lineWidth = 0.22;
-      c.beginPath(); c.arc(0, hz, 12, 0, Math.PI * 2); c.stroke();
+      c.beginPath(); c.arc(0, hz, A.hoops[t].threeDist, 0, Math.PI * 2); c.stroke();
       c.strokeRect(-3.2, Math.min(hz, hz + sgn * 7), 6.4, 7);
       c.beginPath(); c.arc(0, hz + sgn * 7, 2.4, 0, Math.PI * 2); c.stroke();
       // chevrons pointing toward the enemy hoop (this team's attack direction)
@@ -175,7 +183,7 @@
     }
     // midline + center circle
     c.strokeStyle = '#ffffff'; c.lineWidth = 0.25;
-    c.beginPath(); c.moveTo(-20, 0); c.lineTo(20, 0); c.stroke();
+    c.beginPath(); c.moveTo(-HW, 0); c.lineTo(HW, 0); c.stroke();
     c.fillStyle = TH.dark ? '#1a1040' : '#ffe7a8';
     c.beginPath(); c.arc(0, 0, 4, 0, Math.PI * 2); c.fill();
     c.stroke();
@@ -187,7 +195,7 @@
     BBA.Character.star(c, 0, 0, 1.6, 5);
     // border
     c.strokeStyle = 'rgba(255,255,255,0.8)'; c.lineWidth = 0.3;
-    c.strokeRect(-19.6, -33.6, 39.2, 67.2);
+    c.strokeRect(-HW + 0.4, -HL + 0.4, W2 - 0.8, L2 - 0.8);
     // pits become holes in the floor
     for (var pi = 0; pi < A.pits.length; pi++) { var pt = A.pits[pi]; c.clearRect(pt.x0, pt.z0, pt.x1 - pt.x0, pt.z1 - pt.z0); }
     var tex = new THREE.CanvasTexture(cv);
@@ -212,7 +220,7 @@
 
   ArenaView.prototype._floor = function () {
     var A = this.A, TH = this.TH;
-    var geo = new THREE.PlaneGeometry(40, 68);
+    var geo = new THREE.PlaneGeometry(A.halfW * 2, A.halfL * 2);
     var m = new THREE.MeshLambertMaterial({ map: this._floorTexture(), transparent: false, alphaTest: 0.5 });
     var f = new THREE.Mesh(geo, m);
     f.rotation.x = -Math.PI / 2; f.receiveShadow = true;
@@ -748,7 +756,7 @@
 
   ArenaView.prototype._crowd = function (tiers) {
     var A = this.A, g = this.group, W = A.halfW, L = A.halfL, i;
-    var count = this.mobile ? 380 : 760;
+    var count = Math.round((this.mobile ? 380 : 760) * Math.max(1, A.halfL / 34));   // bigger courts have longer stands
     var seats = [];
     // side stands (5 tiers each side), then the end stands behind the decks
     // each tier holds two staggered rows (front and back) so the stands read as packed
@@ -958,16 +966,20 @@
         if (!TH.dark && k % 3 === 0) g.add(box(ww * 0.6, 2, ww * 0.6, self._m('roof', '#dfe8ff'), Math.cos(ang) * r, yBase + hh + 1, Math.sin(ang) * r));
       }
     }
+    // scenery positions were laid out for the classic 40 x 68 court: scale them for bigger courts
+    var kx = A.halfW / 20, kz = A.halfL / 34;
     function lightTowers(col) {
       var ltm = self._m('lt', '#2a2f6a'), lampM = new THREE.MeshBasicMaterial({ color: col || '#fff6d0' });
       [[-30, -40], [30, -40], [-30, 40], [30, 40]].forEach(function (c) {
-        g.add(box(0.8, 26, 0.8, ltm, c[0], 13, c[1]));
-        var lamp = box(5, 3, 0.6, lampM, c[0], 26, c[1]); lamp.lookAt(0, 0, 0); g.add(lamp);
+        g.add(box(0.8, 26, 0.8, ltm, c[0] * kx, 13, c[1] * kz));
+        var lamp = box(5, 3, 0.6, lampM, c[0] * kx, 26, c[1] * kz); lamp.lookAt(0, 0, 0); g.add(lamp);
       });
     }
-    var palmSpots = [[-38, -44], [38, -44], [-38, 44], [38, 44], [-44, -10], [44, 10], [-44, 18], [44, -22]];
-    if (kind === 'stadium') {
-      palmSpots.concat([[-30, -52], [30, 52], [0, -56], [0, 56]]).forEach(function (p) { palm(p[0], p[1]); });
+    var palmSpots = [[-38, -44], [38, -44], [-38, 44], [38, 44], [-44, -10], [44, 10], [-44, 18], [44, -22]].map(function (p) { return [p[0] * kx, p[1] * kz]; });
+    if (kind === 'hero') {
+      this._heroCity(skyline, lightTowers);
+    } else if (kind === 'stadium') {
+      palmSpots.concat([[-30 * kx, -52 * kz], [30 * kx, 52 * kz], [0, -56 * kz], [0, 56 * kz]]).forEach(function (p) { palm(p[0], p[1]); });
       skyline(-2, 1, ['#6c8fd6', '#8aa6e6', '#5a76c0']);
       lightTowers();
     } else if (kind === 'rooftop') {
@@ -1069,6 +1081,59 @@
     }
   };
 
+  /* Hero City: a comic-book city at dusk. Skyscrapers with lit floors, a searchlight
+   * throwing the Bean Signal onto the clouds, and POW!/BAM! billboards over the stands. */
+  ArenaView.prototype._heroCity = function (skyline, lightTowers) {
+    var A = this.A, g = this.group, self = this, i, k;
+    var bcols = ['#2a2350', '#36296a', '#2f3a6a', '#45307a'].map(function (c) { return self._m('hb' + c, c); });
+    var litM = new THREE.MeshBasicMaterial({ color: '#ffd86a' }), litM2 = new THREE.MeshBasicMaterial({ color: '#ff9a5a' });
+    for (k = 0; k < 46; k++) {
+      var ang = k / 46 * Math.PI * 2 + 0.05, r = 110 + (k * 37 % 55);
+      var hh = 30 + (k * 53 % 75), ww = 10 + (k * 13 % 12);
+      var bx = Math.cos(ang) * r, bz = Math.sin(ang) * r;
+      g.add(box(ww, hh, ww, bcols[k % bcols.length], bx, hh / 2 - 2, bz));
+      // lit floors: thin glowing bands wrapped around the tower
+      for (var f = 0; f < 4; f++) {
+        var fy = 6 + ((k * 7 + f * 13) % Math.max(8, hh - 12));
+        g.add(box(ww + 0.2, 0.7, ww + 0.2, (k + f) % 3 ? litM : litM2, bx, fy, bz));
+      }
+      if (k % 4 === 0) g.add(box(0.4, 8, 0.4, self._m('ant', '#1a1530'), bx, hh + 2, bz));   // antenna
+    }
+    // the Bean Signal on the clouds + the searchlight beam that throws it
+    var sig = canvas(256, 256), c = sig.getContext('2d');
+    var grd = c.createRadialGradient(128, 128, 20, 128, 128, 128);
+    grd.addColorStop(0, 'rgba(255,240,150,0.95)'); grd.addColorStop(0.7, 'rgba(255,220,90,0.75)'); grd.addColorStop(1, 'rgba(255,220,90,0)');
+    c.fillStyle = grd; c.beginPath(); c.ellipse(128, 128, 126, 96, 0, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#1a1230';
+    c.beginPath(); c.ellipse(128, 140, 34, 52, 0, 0, Math.PI * 2); c.fill();               // bean silhouette
+    BBA.Character.drawCrown(c, 128, 76, 30);                                                // with a crown
+    var emblem = new THREE.Mesh(new THREE.PlaneGeometry(46, 46), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(sig), transparent: true, depthWrite: false, fog: false }));
+    var ex = -105, ey = 128, ez = -175;   // high and to the left so the jumbotron never hides it
+    emblem.position.set(ex, ey, ez); emblem.lookAt(0, 20, 0); g.add(emblem);
+    var src = new THREE.Vector3(-62, 26, -118), dst = new THREE.Vector3(ex, ey, ez), dir = dst.clone().sub(src), len = dir.length();
+    var beam = new THREE.Mesh(new THREE.CylinderGeometry(16, 1.5, len, 16, 1, true),
+      new THREE.MeshBasicMaterial({ color: '#fff2a0', transparent: true, opacity: 0.12, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, fog: false }));
+    beam.position.copy(src.clone().add(dst).multiplyScalar(0.5));
+    beam.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+    g.add(beam);
+    g.add(box(6, 3, 6, self._m('lamp', '#c8c0e8'), src.x, src.y - 1.5, src.z));
+    // comic billboards over the stands
+    var words = [['POW!', '#ffd23f', '#ff3b4e'], ['BAM!', '#39e6ff', '#2f5bff'], ['ZAP!', '#ff9ec8', '#b86bff'], ['WHAM!', '#7dff7a', '#ff7a2f']];
+    for (i = 0; i < 4; i++) {
+      var bc = canvas(256, 160), b = bc.getContext('2d'), wd = words[i];
+      b.fillStyle = wd[2]; b.beginPath();
+      for (var s = 0; s < 22; s++) { var a = s / 22 * Math.PI * 2, rr = s % 2 ? 58 : 80; b.lineTo(128 + Math.cos(a) * rr * 1.5, 80 + Math.sin(a) * rr); }
+      b.closePath(); b.fill();
+      b.font = 'bold 64px Arial Black, Arial, sans-serif'; b.textAlign = 'center'; b.textBaseline = 'middle';
+      b.lineWidth = 10; b.strokeStyle = '#141418'; b.strokeText(wd[0], 128, 82); b.fillStyle = wd[1]; b.fillText(wd[0], 128, 82);
+      var bb = new THREE.Mesh(new THREE.PlaneGeometry(13, 8), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(bc), transparent: true, depthWrite: false }));
+      var sx = i % 2 ? 1 : -1, sz = i < 2 ? -1 : 1;
+      bb.position.set(sx * (A.halfW + 9), 20, sz * A.halfL * 0.45); bb.lookAt(0, 12, sz * A.halfL * 0.3);
+      g.add(bb);
+    }
+    lightTowers('#ffe27a');
+  };
+
   /* shared lambert material cache per arena view */
   ArenaView.prototype._m = function (key, col, o) {
     this._mc = this._mc || {};
@@ -1152,7 +1217,7 @@
       if (o.geometry) o.geometry.dispose();
       if (o.material) {
         var ms = Array.isArray(o.material) ? o.material : [o.material];
-        for (var i = 0; i < ms.length; i++) { if (ms[i].map) ms[i].map.dispose(); ms[i].dispose(); }
+        for (var i = 0; i < ms.length; i++) { if (ms[i].userData && ms[i].userData.vcTwin) continue; if (ms[i].map) ms[i].map.dispose(); ms[i].dispose(); }   // vcTwin materials are shared across arenas
       }
     });
   };

@@ -91,14 +91,18 @@
     neon: 'linear-gradient(135deg,#2a0f5e,#d23cff 60%,#2fd3ff)',
     pirate: 'linear-gradient(135deg,#8a5a36,#3ab0d8 60%,#f0d48a)',
     space: 'linear-gradient(135deg,#0b0f33,#5b3cc0 60%,#ff4f8b)',
-    snowy: 'linear-gradient(135deg,#e8f6ff,#8bc8ff 60%,#4a6fa0)'
+    snowy: 'linear-gradient(135deg,#e8f6ff,#8bc8ff 60%,#4a6fa0)',
+    hero_city: 'linear-gradient(135deg,#1b1446,#6a2a8a 55%,#ff9a4a)',
+    titan: 'linear-gradient(135deg,#ff9a3a,#2fd3c4 60%,#2f7bff)'
   };
   UI.buildArenaRow = function () {
     var row = $('arena-row'), list = BBA.Arenas.list, cur = BBA.Settings.data.lastSetup.arena || 'bean_bowl';
     row.innerHTML = '';
     list.forEach(function (a) {
       var t = el('button', 'atile' + (a.id === cur ? ' sel' : ''), UI.G.esc(a.name) + (a.id === cur ? '<span class="chk">&#10003;</span>' : ''));
-      t.style.background = ARENA_BG[a.id] || '#333';
+      var th = UI.G.arenaThumbs && UI.G.arenaThumbs[a.id];
+      t.style.background = th ? 'url(' + th + ') center / cover, ' + (ARENA_BG[a.id] || '#333') : (ARENA_BG[a.id] || '#333');
+      if (a.maxTeam > 3) t.innerHTML += '<span class="big">5v5</span>';
       t.title = a.blurb;
       t.addEventListener('click', function () {
         BBA.Settings.data.lastSetup.arena = a.id; BBA.Settings.save();
@@ -289,8 +293,11 @@
     box.innerHTML = '';
     function save() { BBA.Settings.save(); UI.teamsPreview(); }
     box.appendChild(UI.choice('ARENA', BBA.Arenas.list.map(function (a) { return [a.id, a.name]; }), function () { return L.arena || 'bean_bowl'; },
-      function (v) { L.arena = v; save(); UI.G.menuArena = v; UI.buildArenaRow(); }, BBA.Arenas.list.filter(function (a) { return a.id === (L.arena || 'bean_bowl'); })[0].blurb));
-    box.appendChild(UI.choice('TEAM SIZE', [[1, '1 v 1'], [2, '2 v 2'], [3, '3 v 3']], function () { return L.teamSize; }, function (v) { L.teamSize = v; save(); }));
+      function (v) { L.arena = v; save(); UI.G.menuArena = v; UI.buildArenaRow(); UI.buildSetup(); }, BBA.Arenas.list.filter(function (a) { return a.id === (L.arena || 'bean_bowl'); })[0].blurb));
+    var maxT = BBA.Arenas.get(L.arena || 'bean_bowl').maxTeam || 3, sizes = [];
+    for (var ts = 1; ts <= maxT; ts++) sizes.push([ts, ts + ' v ' + ts]);
+    if (L.teamSize > maxT) L.teamSize = maxT;
+    box.appendChild(UI.choice('TEAM SIZE', sizes, function () { return L.teamSize; }, function (v) { L.teamSize = v; save(); }, maxT > 3 ? 'Big court: up to 5 v 5' : 'Pick Hero City or Titan Stadium for 4 v 4 and 5 v 5'));
     box.appendChild(UI.choice('MATCH LENGTH', [[180, '3 minutes'], [240, '4 minutes'], [300, '5 minutes']], function () { return L.duration; }, function (v) { L.duration = v; save(); }));
     box.appendChild(UI.choice('BOT DIFFICULTY', [['easy', 'Easy'], ['normal', 'Normal'], ['hard', 'Hard']], function () { return L.difficulty; }, function (v) { L.difficulty = v; save(); }));
     box.appendChild(UI.choice('WARM-UP', [[0, 'Off'], [30, '30 seconds'], [45, '45 seconds'], [90, '90 seconds'], [-1, "Until I'm ready"]],

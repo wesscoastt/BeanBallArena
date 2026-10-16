@@ -63,7 +63,7 @@ for (var mi = 0; mi < N; mi++) {
       if (Arena.onDeck(p.x, p.z) && s.match.phase === 'play') { deckT[p.id] = (deckT[p.id] || 0) + 1 / 60; if (deckT[p.id] > totals.deckTimeMax) totals.deckTimeMax = deckT[p.id]; }
       else deckT[p.id] = 0;
     }
-    if (chasers[0] > 2 || chasers[1] > 2) totals.chaseViol++;
+    if ((chasers[0] > 2 || chasers[1] > 2) && s.match.phase === 'play') totals.chaseViol++;   // roles go stale during score celebrations; only count live play
   }
   totals.matches++;
   var st = { pts: 0, dunks: 0, shots: 0, made: 0, passes: 0, steals: 0, tackles: 0, intercepts: 0 };

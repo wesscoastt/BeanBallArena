@@ -77,6 +77,7 @@
     BBA.UI.init(G);
     if (BBA.Net) { BBA.Net.onStart = G.startOnline; BBA.Net.onSnapshot = G.onSnapshot; BBA.Net.onEnded = G.onEnded; }
     G.startAttract();
+    G.makeArenaThumbs();
     G.last = performance.now();
     root.requestAnimationFrame(G.frame);
   };
@@ -274,6 +275,51 @@
     G.camera.lookAt(0, 1.0, 0);
   };
 
+  /* Menu map previews: each arena is built off-screen once, photographed from a
+   * bird's-eye angle into a small render target, and cached (also in localStorage,
+   * keyed by game version, so later loads are instant). One arena per step so the
+   * menu never stalls. */
+  G.arenaThumbs = {};
+  G.makeArenaThumbs = function () {
+    var key = 'bba_thumbs_' + C.VERSION, cached = null;
+    try { cached = JSON.parse(root.localStorage.getItem(key) || 'null'); } catch (e) { cached = null; }
+    if (cached) { G.arenaThumbs = cached; BBA.UI.buildArenaRow(); }
+    var queue = BBA.Arenas.list.map(function (a) { return a.id; }).filter(function (id) { return !G.arenaThumbs[id]; });
+    if (!queue.length) return;
+    var W = 320, H = 180;
+    var rt = new THREE.WebGLRenderTarget(W, H), px = new Uint8Array(W * H * 4);
+    var cv = root.document.createElement('canvas'); cv.width = W; cv.height = H;
+    var c2 = cv.getContext('2d'), img = c2.createImageData(W, H);
+    var cam = new THREE.PerspectiveCamera(50, W / H, 0.5, 900);
+    function next() {
+      var id = queue.shift();
+      if (!id) {
+        rt.dispose();
+        try { root.localStorage.setItem(key, JSON.stringify(G.arenaThumbs)); } catch (e) {}
+        return;
+      }
+      try {
+        var def = BBA.Arenas.get(id), sc = new THREE.Scene();
+        var v = new BBA.ArenaView(sc, { arena: def, teamCss: G.teamCss, mobile: true });
+        v.update(0.016, 3, 1);
+        var L = def.halfL, Wd = def.halfW;
+        cam.position.set(Wd * 0.55, L * 0.72, L * 0.62); cam.lookAt(-Wd * 0.05, 0, -L * 0.22);   // high diagonal, inside the stands' roofline
+        var prevT = G.renderer.getRenderTarget();
+        G.renderer.setRenderTarget(rt); G.renderer.render(sc, cam);
+        G.renderer.readRenderTargetPixels(rt, 0, 0, W, H, px);
+        G.renderer.setRenderTarget(prevT);
+        // render targets come out upside down
+        for (var y = 0; y < H; y++) img.data.set(px.subarray((H - 1 - y) * W * 4, (H - y) * W * 4), y * W * 4);
+        c2.putImageData(img, 0, 0);
+        G.arenaThumbs[id] = cv.toDataURL('image/jpeg', 0.78);
+        v.dispose();
+        BBA.UI.buildArenaRow();
+      } catch (e) { if (root.console) console.warn('map preview failed', id, e); }
+      root.setTimeout(next, 120);
+    }
+    root.setTimeout(next, 600);
+  };
+
   /* switch the 3D arena to match the sim (rebuilds only when it changes) */
   G._useArena = function (id) {
     var def = BBA.Arenas.get(id);
@@ -340,7 +386,8 @@
     if (wu < 0 || wu === null) wu = Infinity;
     var S = BBA.Settings.data;
     var r = rng32((Date.now() * 7) & 0xffffff);
-    var size = clamp(setup.teamSize || 3, 1, 3);
+    var maxTeam = BBA.Arenas.get(setup.arena || 'bean_bowl').maxTeam || 3;
+    var size = clamp(setup.teamSize || 3, 1, maxTeam);
     var names = botNames(size * 2, r), roster = [], i, ni = 0;
     G.cosmetics = [];
     roster.push({ team: 0, name: S.name || 'You', isBot: false });

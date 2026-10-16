@@ -54,18 +54,38 @@
     return r.ha + (r.hb - r.ha) * t;
   }
 
-  /* ---------- shared core ---------- */
-  var HOOPS = [
-    { team: 0, x: 0, y: 5.0, z: -26, side: -1, ringR: 1.5, tube: 0.13, boardZ: -27.6, boardThick: 0.25, boardHalfW: 3.2, boardBottom: 4.2, boardTop: 8.2, threeDist: 12 },
-    { team: 1, x: 0, y: 5.0, z: 26, side: 1, ringR: 1.5, tube: 0.13, boardZ: 27.6, boardThick: 0.25, boardHalfW: 3.2, boardBottom: 4.2, boardTop: 8.2, threeDist: 12 }
-  ];
-  var DECK = { xIn: 7.5, xOut: 20, zFront: 28.5, zBack: 34, h: 7, conveyor: 2.6 };
-  var TOWER = { halfW: 3.5, z: 30.2, h: 11 };
-  var SPAWNS = [
-    [{ x: -14, z: -31.2 }, { x: 14, z: -31.2 }, { x: -10.5, z: -32.2 }, { x: 10.5, z: -32.2 }, { x: -17, z: -32.2 }, { x: 17, z: -32.2 }],
-    [{ x: 14, z: 31.2 }, { x: -14, z: 31.2 }, { x: 10.5, z: 32.2 }, { x: -10.5, z: 32.2 }, { x: 17, z: 32.2 }, { x: -17, z: 32.2 }]
-  ];
-  var HOOP_PADS = mirror4([{ type: 'bounce', x: 3.4, z: 20.8, y: 0, r: 1.1, vy: 15 }]);
+  /* ---------- shared core ----------
+   * Court layout derived from the court size, so big 5v5 arenas get hoops, decks,
+   * towers and spawn spots in the same relative places as the classic 40 x 68 court. */
+  var THREE_DIST = 13;   // 3-point distance (was 12; a little deeper so 3s feel earned)
+  function makeCore(hw, hl) {
+    var hz = hl - 8;
+    var hoops = [
+      { team: 0, x: 0, y: 5.0, z: -hz, side: -1, ringR: 1.5, tube: 0.13, boardZ: -(hz + 1.6), boardThick: 0.25, boardHalfW: 3.2, boardBottom: 4.2, boardTop: 8.2, threeDist: THREE_DIST },
+      { team: 1, x: 0, y: 5.0, z: hz, side: 1, ringR: 1.5, tube: 0.13, boardZ: hz + 1.6, boardThick: 0.25, boardHalfW: 3.2, boardBottom: 4.2, boardTop: 8.2, threeDist: THREE_DIST }
+    ];
+    var deck = { xIn: 7.5, xOut: hw, zFront: hl - 5.5, zBack: hl, h: 7, conveyor: 2.6 };
+    var tower = { halfW: 3.5, z: hl - 3.8, h: 11 };
+    var spawns;
+    if (hw === HALF_W && hl === HALF_L) {
+      spawns = [
+        [{ x: -14, z: -31.2 }, { x: 14, z: -31.2 }, { x: -10.5, z: -32.2 }, { x: 10.5, z: -32.2 }, { x: -17, z: -32.2 }, { x: 17, z: -32.2 }],
+        [{ x: 14, z: 31.2 }, { x: -14, z: 31.2 }, { x: 10.5, z: 32.2 }, { x: -10.5, z: 32.2 }, { x: 17, z: 32.2 }, { x: -17, z: 32.2 }]
+      ];
+    } else {
+      // up to 10 spots per team, alternating left/right deck, front row then back row
+      spawns = [[], []];
+      var w = hw - deck.xIn, xs = [0.5, 0.25, 0.75, 0.1, 0.9];
+      for (var k = 0; k < 10; k++) {
+        var s = k % 2 ? 1 : -1, col = Math.floor(k / 2) % 5, back = k >= 10 ? 1 : 0;
+        var x = s * (deck.xIn + 1 + xs[col] * (w - 2)), z = hl - 2.8 + (col % 2) * 1.0 + back;
+        spawns[0].push({ x: x, z: -z }); spawns[1].push({ x: -x, z: z });
+      }
+    }
+    return { hoops: hoops, deck: deck, tower: tower, spawns: spawns, hoopPads: mirror4([{ type: 'bounce', x: 3.4, z: hz - 5.2, y: 0, r: 1.1, vy: 15 }]) };
+  }
+  var CORE = makeCore(HALF_W, HALF_L);
+  var HOOPS = CORE.hoops, DECK = CORE.deck, TOWER = CORE.tower, SPAWNS = CORE.spawns, HOOP_PADS = CORE.hoopPads;
 
   function launchPad(x, z, y, tx, tz, ty, T) {
     return { type: 'launch', x: x, z: z, y: y, r: 1.0, tx: tx, ty: ty, tz: tz, T: T, launchT: T * 0.85 };
@@ -73,9 +93,14 @@
 
   /* Build a complete arena object from a spec. */
   function build(spec) {
+    // per-arena court size (classic 40 x 68 unless the spec says otherwise)
+    var HALF_W = spec.halfW || 20, HALF_L = spec.halfL || 34;
+    var K = spec.core || ((HALF_W === CORE.deck.xOut && HALF_L === CORE.deck.zBack) ? CORE : makeCore(HALF_W, HALF_L));
+    var DECK = K.deck, TOWER = K.tower, HOOPS = K.hoops, SPAWNS = K.spawns;
     var A = {
       id: spec.id, name: spec.name, blurb: spec.blurb || '', theme: spec.theme || {},
       halfW: HALF_W, halfL: HALF_L, wallH: 16, ceiling: 19,
+      maxTeam: spec.maxTeam || 3,
       DECK: DECK, TOWER: TOWER, hoops: HOOPS, spawns: SPAWNS,
       ballSpawn: spec.ballSpawn || { x: 0, y: 7, z: 0 },
       gravity: spec.gravity || 1,
@@ -344,8 +369,61 @@
     });
   })();
 
+  /* ======== BIG COURTS (56 x 92, up to 5v5) ======== */
+  var BIG_W = 28, BIG_L = 46, BIG = makeCore(BIG_W, BIG_L), BHZ = BIG_L - 8;
+
+  /* ---- 8. Hero City: superhero rooftops at dusk, hero-leap pads, a central signal tower ---- */
+  (function () {
+    var blocks = mirror4([
+      box(17, 28, 12, 26, 2.8, 'roof'),            // rooftops along the sidelines
+      box(17, 17.4, 12, 17.5, 3.4, 'rail'), box(17, 17.4, 20.5, 26, 3.4, 'rail')
+    ]).concat([
+      box(-4.5, 4.5, -4.5, 4.5, 1.6, 'stage')       // the signal tower plaza in the middle
+    ]).concat(mirrorZ([box(-2.2, 2.2, 15, 18.5, 1.1, 'crate')]));
+    var ramps = mirror4([ramp('z', 17, 28, 5.5, 12, 5.5, 0, 12, 2.8, 'ramp')])
+      .concat(mirrorZ([ramp('z', -3, 3, 4.5, 8.5, 8.5, 0, 4.5, 1.6, 'ramp')]));
+    SPECS.push({
+      id: 'hero_city', name: 'Hero City', blurb: 'Superhero rooftops for 5v5. Leap pads launch you across the city.',
+      halfW: BIG_W, halfL: BIG_L, core: BIG, maxTeam: 5,
+      theme: { kind: 'hero', floor: ['#2f5bff', '#ffcf3a', '#ffe27a', '#ff3b4e'], plat: '#ff3b4e', platSide: '#7a1630', trim: '#ffd23f',
+        sky: ['#1b1446', '#6a2a8a', '#ff9a4a'], fog: '#4a2f6a', tile: 'rgba(0,0,0,0.07)', halftone: true },
+      blocks: blocks, ramps: ramps,
+      posts: mirror4([{ x: 9, z: 22, r: 0.9, h: 1.8 }]).concat([{ x: -9, z: 0, r: 1.0, h: 1.8 }, { x: 9, z: 0, r: 1.0, h: 1.8 }]),
+      pads: BIG.hoopPads
+        .concat(mirror4([launchPad(22.5, 23.5, 2.8, 0.4, BHZ - 1.4, 3.6, 1.15)]))     // rooftop hero leaps to the rim
+        .concat(mirrorX([{ type: 'bounce', x: 12, z: 0, y: 0, r: 1.2, vy: 16 }]))
+        .concat(mirrorZ([{ type: 'bounce', x: 0, z: 2.5, y: 1.6, r: 1.1, vy: 15 }])),
+      ballSpawn: { x: 0, y: 8.5, z: 0 },
+      nav: mirror4([{ x: 15.8, z: 4.5 }, { x: 22.5, z: 4.6 }, { x: 22.5, z: 27 }, { x: 15.8, z: 27 }, { x: 5.6, z: 5.6 }, { x: 4, z: 19.5 }])
+    });
+  })();
+
+  /* ---- 9. Titan Stadium: the classic layout, super-sized for 5v5 ---- */
+  (function () {
+    var blocks = mirror4([
+      box(15, 28, 13, 23, 2.6, 'plat'),
+      box(15, 15.35, 13, 16.6, 3.2, 'rail'), box(15, 15.35, 19.4, 23, 3.2, 'rail')
+    ]);
+    var ramps = mirror4([ramp('z', 15, 28, 5, 13, 5, 0, 13, 2.6, 'ramp')]);
+    SPECS.push({
+      id: 'titan', name: 'Titan Stadium', blurb: 'The classic layout, super-sized for 5v5 matches.',
+      halfW: BIG_W, halfL: BIG_L, core: BIG, maxTeam: 5,
+      theme: { kind: 'stadium', floor: ['#5572ff', '#f28d3c', '#ffa04a', '#ff5470'], plat: '#2fd3c4', platSide: '#1f7a8a', trim: '#ffc93c', sky: ['#2f6fe0', '#8fd0ff', '#ffd9a8'], fog: '#a9dcff', tile: 'rgba(255,255,255,0.07)' },
+      blocks: blocks, ramps: ramps,
+      posts: [{ x: -7, z: 0, r: 1.0, h: 1.8 }, { x: 7, z: 0, r: 1.0, h: 1.8 }, { x: 0, z: -7, r: 0.9, h: 1.8 }, { x: 0, z: 7, r: 0.9, h: 1.8 }],
+      arms: [
+        { x: 0, z: -18, len: 5.2, r: 0.4, y: 0.6, top: 1.0, w: 1.0, phase: 0, hubR: 0.7, hubH: 1.4 },
+        { x: 0, z: 18, len: 5.2, r: 0.4, y: 0.6, top: 1.0, w: -1.0, phase: 0.8, hubR: 0.7, hubH: 1.4 },
+        { x: -16, z: 0, len: 3.6, r: 0.38, y: 0.6, top: 1.0, w: 1.3, phase: 0.4, hubR: 0.6, hubH: 1.4 },
+        { x: 16, z: 0, len: 3.6, r: 0.38, y: 0.6, top: 1.0, w: -1.3, phase: 1.2, hubR: 0.6, hubH: 1.4 }
+      ],
+      pads: BIG.hoopPads.concat(mirror4([launchPad(21.5, 21.5, 2.6, 0.4, BHZ - 1.4, 3.6, 1.15)])),
+      nav: mirror4([{ x: 13.8, z: 4 }, { x: 21.5, z: 4 }, { x: 21.5, z: 24.4 }, { x: 13.8, z: 24.4 }, { x: 13.8, z: 18 }])
+    });
+  })();
+
   var REG = {}, LIST = [];
-  SPECS.forEach(function (s) { var a = build(s); REG[a.id] = a; LIST.push({ id: a.id, name: a.name, blurb: a.blurb }); });
+  SPECS.forEach(function (s) { var a = build(s); REG[a.id] = a; LIST.push({ id: a.id, name: a.name, blurb: a.blurb, maxTeam: a.maxTeam }); });
 
   return {
     list: LIST,
