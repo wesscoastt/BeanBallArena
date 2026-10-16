@@ -1104,7 +1104,11 @@
       // steadiness: the raw preview jumps with every tiny camera/aim-assist/movement change,
       // so the drawn arc eases toward it, and green/not-green needs a few frames to flip
       var now = performance.now(), adt = Math.min(0.1, (now - (G._arcLast || now)) / 1000); G._arcLast = now;
-      var fresh = !G.arc.visible, ka = fresh ? 1 : 1 - Math.exp(-16 * adt);
+      var fresh = !G.arc.visible, ka = fresh ? 1 : 1 - Math.exp(-11 * adt);
+      // pin the start of the arc to the bean as drawn (the sim position runs at 60 Hz and
+      // jitters against the smoothly interpolated character)
+      var lv = G.views[lp.id], ax = lv ? lv.pos.x - lp.x : 0, ay = lv ? lv.pos.y - lp.y : 0, az = lv ? lv.pos.z - lp.z : 0;
+      var stepT = 2.2 / (n - 1);
       G._makesT = clamp((G._makesT || 0) + (pr.makes ? adt : -adt), -0.08, 0.08);
       if (fresh) G._makesT = pr.makes ? 0.08 : -0.08;
       var makes = G._makesT > 0;
@@ -1113,11 +1117,14 @@
       var sm = G._arcSm || (G._arcSm = new Float32Array(n * 3));
       var j = 0, c = G._arcCol || (G._arcCol = new THREE.Color());
       for (var i = 0; i < n; i++) {
-        var tt = show * i / (n - 1);
+        // fixed time spacing (points never slide along the curve when its end changes);
+        // anything past the end collapses onto the end point
+        var tt = Math.min(show, stepT * i);
         while (j < pts.length - 1 && pts[j + 1].t < tt) j++;
         var p = pts[j], p2 = pts[Math.min(j + 1, pts.length - 1)];
         var f = p2.t > p.t ? Math.max(0, Math.min(1, (tt - p.t) / (p2.t - p.t))) : 0;
-        var tx = p.x + (p2.x - p.x) * f, ty = p.y + (p2.y - p.y) * f, tz = p.z + (p2.z - p.z) * f;
+        var wA = Math.max(0, 1 - tt / 0.45);   // anchor offset fades out along the first part of the flight
+        var tx = p.x + (p2.x - p.x) * f + ax * wA, ty = p.y + (p2.y - p.y) * f + ay * wA, tz = p.z + (p2.z - p.z) * f + az * wA;
         // the start stays glued to the hands; further out eases more
         var k = i < 2 ? 1 : ka;
         sm[i * 3] += (tx - sm[i * 3]) * k; sm[i * 3 + 1] += (ty - sm[i * 3 + 1]) * k; sm[i * 3 + 2] += (tz - sm[i * 3 + 2]) * k;

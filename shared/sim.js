@@ -1294,12 +1294,16 @@
     var assisted = false, hu = !p.isBot;
     var aYaw = hu ? SH.humanAssistYaw : SH.assistYaw, aYawK = hu ? SH.humanAssistYawStrength : SH.assistYawStrength;
     var aWin = hu ? SH.humanAssistWindow : SH.assistWindow, aK = hu ? SH.humanAssistStrength : SH.assistStrength;
-    if (Math.abs(dyaw) < aYaw) { yaw = yaw + dyaw * aYawK; assisted = true; }
+    // assist strength fades smoothly to zero at the edge of its window (full strength in the
+    // inner half). A hard on/off edge made the shot - and the arc preview - snap as you charged.
+    function fade(x) { if (x <= 0.5) return 1; if (x >= 1) return 0; var u = (x - 0.5) / 0.5; return 1 - u * u * (3 - 2 * u); }
+    var wy = fade(Math.abs(dyaw) / aYaw);
+    if (wy > 0) { yaw = yaw + dyaw * aYawK * wy; assisted = true; }
     var c = charge;
     if (assisted) {
       var cs = this._perfectCharge(p, o, yaw, h);
       out.window = aWin;
-      if (cs >= 0 && Math.abs(c - cs) < aWin) c = c + (cs - c) * aK;
+      if (cs >= 0) c = c + (cs - c) * aK * fade(Math.abs(c - cs) / aWin);
       out.perfect = cs;
     } else { out.perfect = -1; }
     this._shotVel(p, o, c, yaw, out);

@@ -33,7 +33,7 @@
       coyote: 0.1,
       jumpBuffer: 0.12,
       holdMul: 0.93,
-      chargeMul: 0.72,
+      chargeMul: 0.55,     // slow down while lining up a shot
       grabberMul: 0.55,
       grabbedMul: 0.38,
 
@@ -80,16 +80,16 @@
       angleHigh: 0.74,
       speedLow: 11,
       speedHigh: 28,
-      carryH: 0.35,
-      carryV: 0.3,
-      assistYaw: 0.45,
+      carryH: 0.12,        // how much running speed carries into a shot (low = arrow stays put while moving)
+      carryV: 0.1,
+      assistYaw: 0.55,
       assistYawStrength: 0.8,
-      assistWindow: 0.15,
+      assistWindow: 0.19,
       assistStrength: 0.65,
       // human players get a more forgiving assist (touch / pad aiming is harder than a bot's math)
-      humanAssistYaw: 0.62,
+      humanAssistYaw: 0.75,
       humanAssistYawStrength: 0.9,
-      humanAssistWindow: 0.19,
+      humanAssistWindow: 0.25,
       humanAssistStrength: 0.75
     },
 

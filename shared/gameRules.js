@@ -80,11 +80,11 @@
   R.HYPE = { max: 100, perSec: 1.4, pass: 5, steal: 15, tackle: 12, block: 22, dunk: 20, score: 14, assist: 8, shoot: 3 };
 
   /* Humanlike lobbies: each bot rolls its own skill around the chosen difficulty,
-   * and now and then one bot in a match is a "sweat" who plays a level up.
+   * (sweat bots are switched off: sweatChance 0 everywhere).
    * sweatChance: per match; sweatAs: the difficulty that sweat plays at. */
   R.LOBBY = {
-    easy:   { spread: 0.25, sweatChance: 0.12, sweatAs: 'normal' },
-    normal: { spread: 0.25, sweatChance: 0.2, sweatAs: 'hard' },
+    easy:   { spread: 0.25, sweatChance: 0, sweatAs: 'normal' },
+    normal: { spread: 0.25, sweatChance: 0, sweatAs: 'hard' },
     hard:   { spread: 0.1,  sweatChance: 0,    sweatAs: 'hard' }
   };
 
