@@ -473,7 +473,7 @@
     inp.mz = fz * ctl.my + rz * ctl.mx;
     var h = ctl.held;
     inp.jump = h.jump; inp.sprint = h.sprint; inp.dive = h.dive; inp.grab = h.grab;
-    inp.pass = h.pass; inp.shoot = h.shoot; inp.aim = h.aim;
+    inp.pass = h.pass; inp.shoot = h.shoot; inp.aim = h.aim; inp.dunk = h.dunk;
     return inp;
   };
 
@@ -821,6 +821,18 @@
         case 'call':
           if (p && !menu && p.team === localTeam && !G._isLocal(p.id)) { G.snd('call', p.x, p.y, p.z); }
           break;
+        case 'block':
+          if (p) {
+            G.fx.burst('stars', p.x, p.y + 1.4, p.z);
+            G.arena.hype(0.6); G.arena.cheer(p.team, 0.8);
+            if (!menu) {
+              BBA.Audio.play('steal');
+              UI.banner(e.kind === 'dunk' ? 'DUNK STUFFED!' : 'BLOCKED!', esc(p.name), 'dunk ' + (p.team === 0 ? 'blue' : 'red'));
+              UI.feed('<b style="color:' + G.teamCss[p.team] + '">' + esc(p.name) + '</b> ' + (e.kind === 'dunk' ? 'stuffed the dunk!' : 'blocked the shot!'));
+            }
+            if (G._isLocal(e.id) || G._isLocal(e.target)) { G.rig.addTrauma(0.4); BBA.Controls.rumble(0.7, 160); }
+          }
+          break;
         case 'dunk': {
           var h = sim.hoops[e.hoop];
           G.arena.flashHoop(e.hoop);
@@ -1017,17 +1029,29 @@
       // full path by default (ends where it drops through the ring or lands); 'short' keeps the old skill mode
       var show = SD.shotArc === 'short' ? 0.62 : pts[pr.endIdx].t;
       var inWin = L.perfect >= 0 && Math.abs(lp.charge - L.perfect) < (L.window || 0.2);
-      info.active = true; info.perfect = L.perfect; info.window = L.window || 0.2; info.makes = pr.makes; info.inWin = inWin;
+      // steadiness: the raw preview jumps with every tiny camera/aim-assist/movement change,
+      // so the drawn arc eases toward it, and green/not-green needs a few frames to flip
+      var now = performance.now(), adt = Math.min(0.1, (now - (G._arcLast || now)) / 1000); G._arcLast = now;
+      var fresh = !G.arc.visible, ka = fresh ? 1 : 1 - Math.exp(-16 * adt);
+      G._makesT = clamp((G._makesT || 0) + (pr.makes ? adt : -adt), -0.08, 0.08);
+      if (fresh) G._makesT = pr.makes ? 0.08 : -0.08;
+      var makes = G._makesT > 0;
+      info.active = true; info.perfect = L.perfect; info.window = L.window || 0.2; info.makes = makes; info.inWin = inWin;
       var pos = G.arc.geometry.attributes.position, col = G.arc.geometry.attributes.color;
+      var sm = G._arcSm || (G._arcSm = new Float32Array(n * 3));
       var j = 0, c = G._arcCol || (G._arcCol = new THREE.Color());
       for (var i = 0; i < n; i++) {
         var tt = show * i / (n - 1);
         while (j < pts.length - 1 && pts[j + 1].t < tt) j++;
         var p = pts[j], p2 = pts[Math.min(j + 1, pts.length - 1)];
         var f = p2.t > p.t ? Math.max(0, Math.min(1, (tt - p.t) / (p2.t - p.t))) : 0;
-        pos.setXYZ(i, p.x + (p2.x - p.x) * f, p.y + (p2.y - p.y) * f, p.z + (p2.z - p.z) * f);
+        var tx = p.x + (p2.x - p.x) * f, ty = p.y + (p2.y - p.y) * f, tz = p.z + (p2.z - p.z) * f;
+        // the start stays glued to the hands; further out eases more
+        var k = i < 2 ? 1 : ka;
+        sm[i * 3] += (tx - sm[i * 3]) * k; sm[i * 3 + 1] += (ty - sm[i * 3 + 1]) * k; sm[i * 3 + 2] += (tz - sm[i * 3 + 2]) * k;
+        pos.setXYZ(i, sm[i * 3], sm[i * 3 + 1], sm[i * 3 + 2]);
         var lt = 0.5 + 0.3 * (1 - i / n);
-        if (pr.makes) c.setHSL(0.36, 1, lt);                 // green: this one's going in
+        if (makes) c.setHSL(0.36, 1, lt);                    // green: this one's going in
         else if (inWin) c.setHSL(0.2, 1, lt);               // yellow-green: close, assist will help
         else c.setHSL(0.1 - 0.1 * lp.charge, 1, lt);       // orange/red: off target
         col.setXYZ(i, c.r, c.g, c.b);
@@ -1035,10 +1059,10 @@
       pos.needsUpdate = true; col.needsUpdate = true;
       G.arc.computeLineDistances();
       G.arc.visible = true;
-      // dots along the same path, marching forward so the direction reads like an arrow
-      var nd = 30, dm = G._dotM || (G._dotM = new THREE.Matrix4()), march = (performance.now() * 0.0012) % 1;
+      // dots along the same path (fixed spacing: sliding dots read as wobble)
+      var nd = 30, dm = G._dotM || (G._dotM = new THREE.Matrix4());
       for (var d = 0; d < nd; d++) {
-        var fi = (d + march) / nd * (n - 1), i0 = Math.floor(fi), i1 = Math.min(n - 1, i0 + 1), ff = fi - i0;
+        var fi = d / (nd - 1) * (n - 1), i0 = Math.floor(fi), i1 = Math.min(n - 1, i0 + 1), ff = fi - i0;
         var px = pos.getX(i0) + (pos.getX(i1) - pos.getX(i0)) * ff, py = pos.getY(i0) + (pos.getY(i1) - pos.getY(i0)) * ff, pz = pos.getZ(i0) + (pos.getZ(i1) - pos.getZ(i0)) * ff;
         var ds = d < 2 ? 0.4 + d * 0.3 : 1 - d / nd * 0.35;   // skip the dots right at the hands
         dm.makeScale(ds, ds, ds); dm.setPosition(px, py, pz);
@@ -1050,12 +1074,11 @@
       if (G.arcDots.instanceColor) G.arcDots.instanceColor.needsUpdate = true;
       G.arcDots.visible = true;
       // landing marker at the end of the arc
-      var e2 = pts[pr.endIdx];
+      var last = n - 1;
       G.arcEnd.visible = SD.shotArc !== 'short';
-      G.arcEnd.position.set(e2.x, e2.y + 0.05, e2.z);
-      G.arcEnd.material.color.setHSL(pr.makes ? 0.36 : (inWin ? 0.2 : 0.07), 1, 0.55);
-      var es = 1 + Math.sin(performance.now() * 0.015) * 0.12;
-      G.arcEnd.scale.set(es, es, es);
+      G.arcEnd.position.set(sm[last * 3], sm[last * 3 + 1] + 0.05, sm[last * 3 + 2]);
+      G.arcEnd.material.color.setHSL(makes ? 0.36 : (inWin ? 0.2 : 0.07), 1, 0.55);
+      G.arcEnd.scale.set(1, 1, 1);
     } else { G.arc.visible = false; G.arcEnd.visible = false; G.arcDots.visible = false; }
     var target = lp.passHeld && lp.passT > 0.2 ? lp.passAim : -1;
     if (target >= 0) {

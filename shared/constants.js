@@ -99,7 +99,9 @@
       range: 2.9,
       below: 3.3,
       pullTime: 0.22,
-      totalTime: 0.42
+      totalTime: 0.42,
+      leapRange: 7.5,     // dunk button: auto-leap from this far out (ground distance to the rim)
+      leapTime: 0.5
     },
 
     SCORE: {
@@ -111,6 +113,6 @@
     },
 
     // Input button names (shared with network protocol)
-    BUTTONS: ['jump', 'sprint', 'dive', 'grab', 'pass', 'shoot', 'aim']
+    BUTTONS: ['jump', 'sprint', 'dive', 'grab', 'pass', 'shoot', 'aim', 'dunk']
   };
 });

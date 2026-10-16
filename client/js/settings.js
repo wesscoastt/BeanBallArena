@@ -33,10 +33,10 @@
     keys: {
       forward: ['KeyW', 'ArrowUp'], back: ['KeyS', 'ArrowDown'], left: ['KeyA', 'ArrowLeft'], right: ['KeyD', 'ArrowRight'],
       jump: ['Space'], sprint: ['ShiftLeft', 'ShiftRight'], dive: ['KeyC', 'ControlLeft'], grab: ['Mouse0', 'KeyE'],
-      shoot: ['Mouse2', 'KeyR'], pass: ['KeyQ'], ballcam: ['KeyF'], aim: ['KeyV'], pause: ['Escape', 'KeyP'], ready: ['Enter']
+      shoot: ['Mouse2', 'KeyR'], pass: ['KeyQ'], ballcam: ['KeyF'], aim: ['KeyV'], pause: ['Escape', 'KeyP'], ready: ['Enter'], dunk: ['KeyX']
     },
     pad: {
-      jump: 0, pass: 1, dive: 2, ballcam: 3, sprint: 4, shoot: 5, aim: 6, grab: 7, ready: 8, pause: 9, sprintAlt: 10
+      jump: 0, pass: 1, dive: 2, dunk: 3, sprint: 4, shoot: 5, aim: 6, grab: 7, ready: 8, pause: 9, sprintAlt: 10, ballcam: 11
     },
     // match setup memory
     lastSetup: { teamSize: 3, duration: 240, difficulty: 'normal', modifier: 'none', warmup: 45 },
@@ -67,7 +67,10 @@
     load: function () {
       try {
         var raw = root.localStorage && root.localStorage.getItem(KEY);
-        if (raw) this.data = deepMerge(DEFAULTS, JSON.parse(raw));
+        var saved = raw ? JSON.parse(raw) : null;
+        if (raw) this.data = deepMerge(DEFAULTS, saved);
+        // dunk button added: it takes Y/Triangle, so an older save with ball cam on that button moves it to RS click
+        if (saved && saved.pad && saved.pad.dunk === undefined && this.data.pad.ballcam === 3) this.data.pad.ballcam = 11;
         // v0.5: the old on/off "full arc" toggle became the shotArc choice (full is now the default)
         if (this.data.fullArc !== undefined) { delete this.data.fullArc; this.data.shotArc = 'full'; }
       } catch (e) { this.data = clone(DEFAULTS); }

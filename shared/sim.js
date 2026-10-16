@@ -38,7 +38,7 @@
   }
 
   function emptyInput() {
-    return { mx: 0, mz: 0, look: 0, jump: false, sprint: false, dive: false, grab: false, pass: false, shoot: false, aim: false };
+    return { mx: 0, mz: 0, look: 0, jump: false, sprint: false, dive: false, grab: false, pass: false, shoot: false, aim: false, dunk: false };
   }
 
   function Sim(opts) {
@@ -507,6 +507,14 @@
     if (auth && p.state === 'dive' && hasBall && !p.grounded && pressed('shoot') && this.dunkEligible(p)) {
       this._startDunk(p);
     }
+    // DUNK BUTTON (Crown Jam style): in range on the ground -> leap to the rim; in the air -> dunk now.
+    // The leap is plain movement (so client prediction can run it); the dunk itself is server-side.
+    if (p.autoDunkT > 0) { p.autoDunkT -= dt; if (p.autoDunkT <= 0 || !hasBall) p.autoDunk = false; }
+    if (act && hasBall && pressed('dunk')) {
+      if (this.dunkEligible(p)) { if (auth) this._startDunk(p); }
+      else if (this.dunkLeapOk(p)) this._dunkLeap(p);
+    }
+    if (auth && p.autoDunk && hasBall && !p.grounded && p.state !== 'dunk' && this.dunkEligible(p)) { p.autoDunk = false; this._startDunk(p); }
 
     act = this.canAct(p) && !frozen;
 
@@ -946,15 +954,18 @@
         var c = ps[j];
         if (c.hidden) continue;
         var dy = a.y - c.y;
-        if (dy > 1.45 || dy < -1.45) continue;
+        var aT = this._tackling(a), cT = this._tackling(c);
+        // a dive can reach a dunker up at the rim (stuffs the dunk)
+        var vLim = ((aT && c.state === 'dunk') || (cT && a.state === 'dunk')) ? 3.2 : 1.45;
+        if (dy > vLim || dy < -vLim) continue;
         var dx = c.x - a.x, dz = c.z - a.z, d2 = dx * dx + dz * dz;
-        var lim = r2 + ((a.state === 'dive' || c.state === 'dive') ? 0.25 : 0);
+        var lim = r2 + ((aT || cT) ? 0.45 : 0);
         if (d2 >= lim * lim) continue;
         var d = Math.sqrt(d2) || 0.001, nx = dx / d, nz = dz / d;
         if (d2 < 0.000001) { nx = 1; nz = 0; }
 
-        if (a.team !== c.team && (a.state === 'dive' || c.state === 'dive')) {
-          var aDive = a.state === 'dive' && !a.tackled, cDive = c.state === 'dive' && !c.tackled;
+        if (a.team !== c.team && (aT || cT)) {
+          var aDive = aT, cDive = cT;
           if (aDive && cDive) {
             this._tackle(a, c, nx, nz, 0.5);
             this._tackle(c, a, -nx, -nz, 0.5);
@@ -984,13 +995,24 @@
     }
   };
 
+  /* A dive (and the slide right after landing) tackles whoever it runs into. */
+  Sim.prototype._tackling = function (p) {
+    return !p.tackled && (p.state === 'dive' || (p.state === 'slide' && p.stateT > P.slideTime * 0.35));
+  };
+
   Sim.prototype._tackle = function (a, t, nx, nz, scale) {
     // a dives into t along normal (nx,nz) pointing a->t
     var rvx = a.vx - t.vx, rvz = a.vz - t.vz;
     var impact = rvx * nx + rvz * nz;
+    // any real contact from a dive counts (glancing hits included): use the diver's own
+    // speed as the floor so chasing a runner from behind still knocks them over
+    var own = Math.sqrt(a.vx * a.vx + a.vz * a.vz);
+    impact = Math.max(impact, own * 0.5, t.state === 'dunk' ? P.tackleMinImpact + 2 : 0);
+    if (impact < P.tackleMinImpact * 0.5) return;   // brushing past someone at a crawl: no tackle, dive stays live
     a.tackled = true;
-    if (impact < P.tackleMinImpact) return;
+    impact = Math.max(impact, P.tackleMinImpact);
     var strength = impact * this.settings.tackleStrength * scale;
+    if (t.state === 'dunk' || (t.autoDunk && this.ball.holder === t.id)) this.emit({ t: 'block', id: a.id, target: t.id, kind: 'dunk' });
     var carrier = this.ball.holder === t.id;
     if (t.stunImmune > 0 || t.state === 'stun') {
       // protected: just a shove
@@ -1029,6 +1051,34 @@
       if (f < 0.15 && fv < 0.3) return false;
     }
     return true;
+  };
+
+  /* Can the dunk button launch a leap from here? (ball in hand, on the ground, close enough, field side) */
+  Sim.prototype.dunkLeapOk = function (p) {
+    if (this.ball.holder !== p.id || !p.grounded || p.grabbedBy >= 0) return false;
+    if (p.state !== 'normal' && p.state !== 'recover') return false;
+    var ph = this.match.phase;
+    if (ph !== 'play' && ph !== 'buzzer' && ph !== 'warmup') return false;
+    var h = this.attackHoop(p.team);
+    var dx = h.x - p.x, dz = h.z - p.z, d = Math.sqrt(dx * dx + dz * dz);
+    if (d > DK.leapRange || (p.z - h.z) * h.side > 0.3) return false;
+    return h.y - p.y > 1.2;   // not already standing up at rim height
+  };
+
+  Sim.prototype._dunkLeap = function (p) {
+    var h = this.attackHoop(p.team);
+    var dx = h.x - p.x, dz = h.z - p.z, d = Math.sqrt(dx * dx + dz * dz) || 1;
+    // aim for a spot just in front of the rim, a little below it (inside the dunk window)
+    var stop = Math.min(1.0, d * 0.5);
+    var tx = h.x - dx / d * stop, tz = h.z - dz / d * stop, ty = h.y - 1.7;
+    var T = clamp(0.32 + d * 0.035, 0.38, DK.leapTime + 0.1), g = this.gPlayer;
+    p.vx = (tx - p.x) / T; p.vz = (tz - p.z) / T; p.vy = (ty - p.y + 0.5 * g * T * T) / T;
+    p.yaw = Math.atan2(dx, dz);
+    p.grounded = false; p.coyote = 0; p.jumpBuf = 0;
+    p.launchT = T;                 // little air steering, so the arc lands where aimed
+    p.charging = false; p.passHeld = false;
+    p.autoDunk = true; p.autoDunkT = T + 0.35;
+    this.emit({ t: 'jump', id: p.id });
   };
 
   Sim.prototype._startDunk = function (p) {
@@ -1547,6 +1597,17 @@
       var dx = b.x - p.x, dy = b.y - sy, dz = b.z - p.z;
       var d = Math.sqrt(dx * dx + dy * dy + dz * dz);
       var ignored = (b.ignoreId === p.id && b.ignoreT > 0);
+      // a defender diving into a fresh shot swats it away (shot block)
+      var lt = b.lastThrow;
+      if (!this.predictOnly && b.state === 'free' && b.inFlight && lt && lt.kind === 'shot' && lt.team !== p.team &&
+          this.time - lt.t < 0.8 && (p.state === 'dive' || p.state === 'slide') && d < R + P.radius + 0.55) {
+        var fl = Math.sqrt(p.vx * p.vx + p.vz * p.vz) || 1;
+        b.vx = p.vx / fl * 6 + (b.vx * 0.15); b.vz = p.vz / fl * 6 + (b.vz * 0.15); b.vy = Math.max(3, b.vy * 0.2);
+        b.lastThrow = null; b.inFlight = false; b.lastTouchTeam = p.team;
+        b.ignoreId = p.id; b.ignoreT = 0.25;
+        this.emit({ t: 'block', id: p.id, target: lt.by, kind: 'shot' });
+        continue;
+      }
       if (!ignored && this.canCatch(p)) {
         var cr = (b.passTarget === p.id) ? P.catchRadiusTarget : P.catchRadius;
         if (p.state === 'dive') cr += 0.35;

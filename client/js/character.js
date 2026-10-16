@@ -92,13 +92,9 @@
     else if (style === 'hoops') { g.fillRect(0, 36, 512, 10); g.fillRect(0, 82, 512, 10); }
     else if (style === 'split') { g.fillRect(256, 0, 256, 128); }
     g.restore();
-    // custom jerseys keep thick team-colored trim so teams stay readable
-    if (custom) {
-      g.fillStyle = teamColor; g.fillRect(0, 0, 512, 18); g.fillRect(0, 110, 512, 18);
-      g.fillStyle = acc; g.fillRect(0, 18, 512, 4); g.fillRect(0, 106, 512, 4);
-    } else {
-      g.fillStyle = acc; g.fillRect(0, 6, 512, 8); g.fillRect(0, 114, 512, 8);
-    }
+    // thin accent trim only: custom jersey colors show fully (the team still reads from
+    // the floor ring, name tag and shorts waistband)
+    g.fillStyle = acc; g.fillRect(0, 6, 512, 8); g.fillRect(0, 114, 512, 8);
     g.fillStyle = 'rgba(0,0,0,0.18)'; g.fillRect(0, 0, 512, 5);
     var num = (number < 10 ? '0' : '') + number;
     g.textAlign = 'center'; g.textBaseline = 'middle';

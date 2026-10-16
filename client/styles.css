@@ -245,6 +245,10 @@ body.in-menu #touch-ui { display: none !important; }
 .tbtn.down { background: rgba(255,201,60,.85); color: #3a1d00; transform: scale(.94); }
 .tbtn-jump { background: rgba(47,123,255,.6); }
 .tbtn-shoot.hot { border-color: var(--gold); box-shadow: 0 0 14px rgba(255,201,60,.8); }
+/* dunk button: dim until you're in dunk range with the ball, then it lights up */
+.tbtn-dunk { opacity: .3; transition: opacity .15s, transform .15s, box-shadow .15s; }
+.tbtn-dunk.ready { opacity: 1; border-color: #ff7a2f; background: rgba(255,122,47,.55); box-shadow: 0 0 18px rgba(255,122,47,.9); transform: scale(1.12); }
+#touch-ui.editing .tbtn-dunk { opacity: 1; }
 .tbtn-pass.hot { border-color: #6fdc4a; }
 .tbtn-pause { position: absolute; top: max(10px, env(safe-area-inset-top)); right: max(110px, calc(env(safe-area-inset-right) + 100px)); width: 40px; height: 40px; border-radius: 10px; background: rgba(20,26,80,.62); border: 2px solid rgba(255,255,255,.5); display: flex; align-items: center; justify-content: center; font: 16px var(--font-h); }
 #touch-ui.editing { display: block !important; z-index: 60; background: rgba(0,0,0,.35); }

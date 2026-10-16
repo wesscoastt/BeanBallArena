@@ -401,10 +401,10 @@
       box.appendChild(UI.choice('AIM ASSIST (pad/touch)', [['strong', 'Strong'], ['normal', 'Normal'], ['off', 'Off']], function () { return S.aimAssist || 'normal'; }, function (v) { S.aimAssist = v; save(); }, 'While charging a shot, the camera turns toward the hoop'));
       box.appendChild(el('div', 'orow', '<div class="olab" style="color:#ffc93c">KEYBOARD + MOUSE</div>'));
       var acts = [['forward', 'Move forward'], ['back', 'Move back'], ['left', 'Move left'], ['right', 'Move right'], ['jump', 'Jump'], ['sprint', 'Sprint'], ['dive', 'Dive / tackle'],
-        ['grab', 'Grab / pick up'], ['shoot', 'Shoot (hold)'], ['pass', 'Pass / call for pass'], ['aim', 'Aim'], ['ballcam', 'Ball camera'], ['pause', 'Pause']];
+        ['grab', 'Grab / pick up'], ['shoot', 'Shoot (hold)'], ['dunk', 'Dunk (near the hoop)'], ['pass', 'Pass / call for pass'], ['aim', 'Aim'], ['ballcam', 'Ball camera'], ['pause', 'Pause']];
       for (var a = 0; a < acts.length; a++) box.appendChild(UI.bindRow(acts[a][0], acts[a][1], 'key'));
       box.appendChild(el('div', 'orow', '<div class="olab" style="color:#ffc93c">CONTROLLER</div><div class="odesc">Xbox / PlayStation / Android handhelds</div>'));
-      var pacts = [['jump', 'Jump'], ['sprint', 'Sprint'], ['dive', 'Dive / tackle'], ['grab', 'Grab / pick up'], ['shoot', 'Shoot (hold)'], ['pass', 'Pass / call'], ['aim', 'Aim (+Grab = shoot)'], ['ballcam', 'Ball camera'], ['pause', 'Pause']];
+      var pacts = [['jump', 'Jump'], ['sprint', 'Sprint'], ['dive', 'Dive / tackle'], ['grab', 'Grab / pick up'], ['shoot', 'Shoot (hold)'], ['dunk', 'Dunk'], ['pass', 'Pass / call'], ['aim', 'Aim (+Grab = shoot)'], ['ballcam', 'Ball camera'], ['pause', 'Pause']];
       for (a = 0; a < pacts.length; a++) box.appendChild(UI.bindRow(pacts[a][0], pacts[a][1], 'pad'));
     } else if (tab === 'mobile') {
       box.appendChild(UI.slider('BUTTON SIZE', 0.7, 1.5, 0.05, function () { return S.touchSize; }, function (v) { S.touchSize = v; save(); BBA.Controls.applyTouchLayout(); }, pct));
@@ -479,7 +479,7 @@
     function pn(a) { return g.padButtonName(S.pad[a]); }
     var acts = [['Move', 'WASD', 'Left stick', 'Left thumb'], ['Camera', 'Mouse', 'Right stick', 'Drag right side'], ['Jump', kn('jump'), pn('jump'), 'Jump'],
       ['Sprint', kn('sprint'), pn('sprint') + ' / L3', 'Push stick 80%+'], ['Dive / tackle', kn('dive'), pn('dive'), 'Dive'], ['Grab / pick up', kn('grab'), pn('grab'), 'Grab'],
-      ['Shoot (hold)', kn('shoot'), pn('shoot') + ' or ' + pn('aim') + '+' + pn('grab'), 'Shoot'], ['Pass (tap) / aimed pass (hold)', kn('pass'), pn('pass'), 'Pass'],
+      ['Shoot (hold)', kn('shoot'), pn('shoot') + ' or ' + pn('aim') + '+' + pn('grab'), 'Shoot'], ['Dunk (near the hoop)', kn('dunk'), pn('dunk'), 'Dunk'], ['Pass (tap) / aimed pass (hold)', kn('pass'), pn('pass'), 'Pass'],
       ['Call for pass', kn('pass') + ' (no ball)', pn('pass') + ' (no ball)', 'Pass (no ball)'], ['Ball camera', kn('ballcam'), pn('ballcam'), 'Ball'], ['Pause', kn('pause'), pn('pause'), 'II']];
     var cols = ['KEYBOARD + MOUSE', 'CONTROLLER', 'TOUCH'], html = '', c, i;
     for (c = 0; c < 3; c++) {
@@ -487,8 +487,8 @@
       for (i = 0; i < acts.length; i++) html += '<div><span>' + acts[i][0] + '</span><b>' + UI.G.esc(acts[i][c + 1]) + '</b></div>';
       html += '</div>';
     }
-    html += '<div class="help-tips"><b>Tips:</b> Dunk by jumping near the enemy hoop with the ball and pressing Shoot (or Jump again) in the air. Bounce pads and the launch pads on the side platforms make dunks easy. ' +
-      'Shots from outside the painted arc are worth 3. Dive into a ball carrier to knock the ball loose. Grab and hold a carrier to steal it. Tap Pass without the ball to call for it.</div>';
+    html += '<div class="help-tips"><b>Tips:</b> Get close to the enemy hoop with the ball and press Dunk: you leap to the rim and slam it (it lights up when you\'re in range). Bounce pads and the launch pads on the side platforms make dunks easy. ' +
+      'Shots from outside the painted arc are worth 3. Dive into anyone to tackle them: it knocks the ball loose, swats away fresh shots and stuffs dunks. Grab and hold a carrier to steal it. Tap Pass without the ball to call for it.</div>';
     $('help-grid').innerHTML = html;
   };
 
@@ -621,13 +621,14 @@
     // contextual prompt
     var pr = $('prompt'), txt = '', cls = '';
     var hasBall = b.holder === lp.id;
+    var dunkReady = hasBall && (sim.dunkEligible(lp) || sim.dunkLeapOk(lp));
     if (m.phase === 'ended' || lp.hidden) txt = '';
-    else if (hasBall && sim.dunkEligible(lp)) { txt = 'DUNK! ' + key('shoot'); cls = 'dunk'; }
+    else if (dunkReady) { txt = 'DUNK! ' + key('dunk'); cls = 'dunk'; }
     else if (hasBall) {
       var h = sim.attackHoop(lp.team), hd = Math.sqrt((h.x - lp.x) * (h.x - lp.x) + (h.z - lp.z) * (h.z - lp.z));
       if (lp.charging) txt = (G.shotInfo && G.shotInfo.makes) ? 'Release now! ' + key('shoot') : 'Release ' + key('shoot') + ' when the arc turns green';
       else if (lp.passHeld && lp.passT > 0.2) txt = lp.passAim >= 0 ? 'Release to pass' : 'Release to throw';
-      else if (hd < 7) txt = key('jump') + ' then ' + key('shoot') + ' in the air to DUNK';
+      else if (hd < 10) txt = 'Get closer and press ' + key('dunk') + ' to DUNK';
       else if (UI.hintT < 40 || hd < 18) txt = 'Hold ' + key('shoot') + ' shoot · ' + key('pass') + ' pass';
     } else if (b.state === 'free' && m.phase === 'play') {
       var dx = b.x - lp.x, dy = b.y - (lp.y + 0.95), dz = b.z - lp.z;
@@ -647,6 +648,7 @@
     if (BBA.Controls.touchBtnEls) {
       BBA.Controls.touchBtnEls.shoot.classList.toggle('hot', hasBall);
       BBA.Controls.touchBtnEls.pass.classList.toggle('hot', hasBall);
+      if (BBA.Controls.touchBtnEls.dunk) BBA.Controls.touchBtnEls.dunk.classList.toggle('ready', !!dunkReady);
     }
     // hints fade
     $('hints').style.opacity = UI.hintT < 25 ? 0.85 : 0;

@@ -6,7 +6,7 @@
   var BBA = root.BBA = root.BBA || {};
   var doc = root.document;
 
-  var ACTIONS = ['jump', 'sprint', 'dive', 'grab', 'pass', 'shoot', 'aim', 'ballcam', 'ready'];
+  var ACTIONS = ['jump', 'sprint', 'dive', 'grab', 'pass', 'shoot', 'aim', 'ballcam', 'ready', 'dunk'];
   var SPRINT_AT = 0.9;   // touch stick tilt that triggers sprint
 
   var C = {
@@ -30,7 +30,7 @@
   };
 
   function emptyState() {
-    return { mx: 0, my: 0, lookX: 0, lookY: 0, held: { jump: false, sprint: false, dive: false, grab: false, pass: false, shoot: false, aim: false, ballcam: false, ready: false }, device: C.device, pause: false, ballcamPress: false };
+    return { mx: 0, my: 0, lookX: 0, lookY: 0, held: { jump: false, sprint: false, dive: false, grab: false, pass: false, shoot: false, aim: false, ballcam: false, ready: false, dunk: false }, device: C.device, pause: false, ballcamPress: false };
   }
 
   function bound(action, code) {
@@ -219,6 +219,7 @@
       h.shoot = h.shoot || pressedNow[map.shoot];
       h.aim = h.aim || pressedNow[map.aim];
       h.grab = h.grab || pressedNow[map.grab];
+      h.dunk = h.dunk || pressedNow[map.dunk === undefined ? 3 : map.dunk];
       h.ready = h.ready || pressedNow[map.ready === undefined ? 8 : map.ready];
       pressedNow = pressedNow0;
     }
@@ -232,7 +233,8 @@
     { id: 'pass', label: 'Pass', icon: '➶', r: 17, b: 16, size: 66 },
     { id: 'dive', label: 'Dive', icon: '➘', r: 20, b: 2, size: 62 },
     { id: 'shoot', label: 'Shoot', icon: '◎', r: 14, b: 33, size: 66 },
-    { id: 'ballcam', label: 'Ball', icon: '◉', r: 3, b: 43, size: 50 }
+    { id: 'ballcam', label: 'Ball', icon: '◉', r: 3, b: 43, size: 50 },
+    { id: 'dunk', label: 'Dunk', icon: '★', r: 27, b: 31, size: 64 }
   ];
   C.TOUCH_BTNS = TOUCH_BTNS;
 
@@ -472,7 +474,7 @@
     var S = BBA.Settings.data;
     if (C.device === 'pad') return C.padButtonName(S.pad[action]);
     if (C.device === 'touch') {
-      var map = { jump: 'Jump', dive: 'Dive', grab: 'Grab', pass: 'Pass', shoot: 'Shoot', ballcam: 'Ball', sprint: 'Push stick', aim: 'Shoot' };
+      var map = { jump: 'Jump', dive: 'Dive', grab: 'Grab', pass: 'Pass', shoot: 'Shoot', ballcam: 'Ball', sprint: 'Push stick', aim: 'Shoot', dunk: 'Dunk' };
       return map[action] || action;
     }
     var k = (S.keys[action] || [])[0] || '?';

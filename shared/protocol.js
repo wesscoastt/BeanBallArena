@@ -18,7 +18,7 @@
     overtime: 'overtime', matchEnded: 'matchEnded', lobbyState: 'lobbyState', error: 'errorMsg'
   };
 
-  var BITS = { jump: 1, sprint: 2, dive: 4, grab: 8, pass: 16, shoot: 32, aim: 64 };
+  var BITS = { jump: 1, sprint: 2, dive: 4, grab: 8, pass: 16, shoot: 32, aim: 64, dunk: 128 };
 
   /* Pack an input into [seq, mx*127, mz*127, look*1000, bits] */
   function packInput(seq, inp) {
