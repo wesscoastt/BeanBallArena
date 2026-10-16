@@ -27,7 +27,7 @@
       turnWalk: 15,
       turnSprint: 6.5,
       turnAim: 20,
-      jumpVel: 14.0,       // Crown Jam-style big jump: up near the rim (feet ~3.3 m), can hop onto platforms
+      jumpVel: 14.8,       // Crown Jam-style big jump: feet ~3.7 m, head above the rim
       gravity: 30,
       stepUp: 0.45,
       coyote: 0.1,
@@ -40,7 +40,7 @@
       diveSpeed: 14,
       diveMax: 16.5,
       diveUp: 5.2,
-      diveAirUp: 2.2,
+      diveAirUp: 7.5,      // diving out of a jump gives a real boost: a full dive goes over the rim
       diveCooldown: 0.95,
       slideTime: 0.34,
       recoverTime: 0.18,
