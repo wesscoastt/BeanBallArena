@@ -20,7 +20,7 @@ var LIMITS = {
 var CHOICES = {
   difficulty: ['easy', 'normal', 'hard'],
   modifier: ['none', 'superbounce', 'lowgravity', 'heavyball', 'megaball', 'turbo'],
-  overtime: [true, false], autoFillBots: [true, false], kickoffReset: [true, false], arena: require('../shared/arenaDef.js').ids
+  overtime: [true, false], autoFillBots: [true, false], kickoffReset: [true, false], abilities: [true, false], arena: require('../shared/arenaDef.js').ids
 };
 
 function cleanName(n) {

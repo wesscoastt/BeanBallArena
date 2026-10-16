@@ -15,6 +15,7 @@
     scoreLimit: 0,        // 0 = none
     mercyLead: 12,        // win instantly when leading by this many points (0 = off)
     kickoffReset: true,   // after every score, everyone goes back to their deck for a new drop
+    abilities: true,      // Hype meter + arena-themed abilities
     overtime: true,
     difficulty: 'normal',
     autoFillBots: true,
@@ -54,6 +55,29 @@
       dodge: 0.55, passSense: 0.95, shotRangeMul: 1.1, callPass: 0.5, humanEase: 0
     }
   };
+
+  /* ---- Abilities (Crown Jam style) ----
+   * Fill your Hype meter by playing well, then press Ability. Every arena has a
+   * power that fits its theme; Hero City hands each player one of four hero powers.
+   * dur: seconds active (instant powers keep a short duration for the visuals). */
+  R.ABILITIES = {
+    bigbean: { name: 'BIG BEAN', short: 'Big', dur: 7, color: '#ffd23f', desc: 'Grow huge: bowl people over, can\'t be tackled' },
+    jetpack: { name: 'JETPACK LEAP', short: 'Jet', dur: 3.5, color: '#ff9a3a', desc: 'Rocket into the air and glide' },
+    magnet:  { name: 'MAGNET HANDS', short: 'Magnet', dur: 7, color: '#ff4f4f', desc: 'Loose balls fly to you' },
+    dash:    { name: 'LIGHT DASH', short: 'Dash', dur: 4, color: '#39e6ff', desc: 'Zoom around and dive with no cooldown' },
+    cannon:  { name: 'CANNON BLAST', short: 'Blast', dur: 0.7, color: '#c58a52', desc: 'Blast everyone nearby off their feet' },
+    moon:    { name: 'MOON BOOTS', short: 'Moon', dur: 8, color: '#b86bff', desc: 'Huge floaty jumps' },
+    freeze:  { name: 'FREEZE RAY', short: 'Freeze', dur: 0.7, color: '#8be0ff', desc: 'Freeze the opponent in front of you' },
+    speed:   { name: 'SUPER SPEED', short: 'Speed', dur: 5, color: '#ffd23f', desc: 'Lightning fast, tackles bounce off' },
+    flight:  { name: 'FLIGHT', short: 'Fly', dur: 4.5, color: '#5b8cff', desc: 'Take off and soar to the hoop' },
+    pound:   { name: 'GROUND POUND', short: 'Pound', dur: 0.8, color: '#ff3b4e', desc: 'Super strength: smash the ground, knock everyone down' },
+    shield:  { name: 'FORCE FIELD', short: 'Shield', dur: 6, color: '#6fdc4a', desc: 'Nobody can tackle you or steal the ball' }
+  };
+  R.ARENA_ABILITIES = {
+    bean_bowl: ['bigbean'], titan: ['bigbean'], rooftop: ['jetpack'], factory: ['magnet'], neon: ['dash'],
+    pirate: ['cannon'], space: ['moon'], snowy: ['freeze'], hero_city: ['speed', 'flight', 'pound', 'shield']
+  };
+  R.HYPE = { max: 100, perSec: 1.4, pass: 5, steal: 15, tackle: 12, block: 22, dunk: 20, score: 14, assist: 8, shoot: 3 };
 
   /* Humanlike lobbies: each bot rolls its own skill around the chosen difficulty,
    * and now and then one bot in a match is a "sweat" who plays a level up.

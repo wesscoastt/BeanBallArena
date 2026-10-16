@@ -18,7 +18,7 @@
     overtime: 'overtime', matchEnded: 'matchEnded', lobbyState: 'lobbyState', error: 'errorMsg'
   };
 
-  var BITS = { jump: 1, sprint: 2, dive: 4, grab: 8, pass: 16, shoot: 32, aim: 64, dunk: 128 };
+  var BITS = { jump: 1, sprint: 2, dive: 4, grab: 8, pass: 16, shoot: 32, aim: 64, dunk: 128, ability: 256 };
 
   /* Pack an input into [seq, mx*127, mz*127, look*1000, bits] */
   function packInput(seq, inp) {
@@ -46,7 +46,7 @@
   var P_FIELDS = ['x', 'y', 'z', 'vx', 'vy', 'vz', 'yaw', 'state', 'stateT', 'grounded', 'grabTarget', 'grabbedBy', 'grabT',
     'charge', 'charging', 'hidden', 'passHeld', 'passT', 'passAim', 'callT', 'throwAnim', 'throwKind', 'celebrateT', 'wobble',
     'sprinting', 'diveCd', 'grabCd', 'grabImmune', 'stunImmune', 'launchT', 'padCd', 'coyote', 'jumpBuf', 'catchCd', 'moveAmt',
-    'respawnT', 'chargeBtn', 'tackled'];
+    'respawnT', 'chargeBtn', 'tackled', 'hype', 'ability', 'abilityT', 'frozenT'];
   var B_FIELDS = ['x', 'y', 'z', 'vx', 'vy', 'vz', 'state', 'holder', 'passTarget', 'inFlight', 'ignoreId', 'ignoreT'];
   var M_FIELDS = ['phase', 'phaseT', 'countdown', 'clock', 'overtime', 'winner'];
 

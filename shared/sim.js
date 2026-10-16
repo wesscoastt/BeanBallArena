@@ -38,7 +38,7 @@
   }
 
   function emptyInput() {
-    return { mx: 0, mz: 0, look: 0, jump: false, sprint: false, dive: false, grab: false, pass: false, shoot: false, aim: false, dunk: false };
+    return { mx: 0, mz: 0, look: 0, jump: false, sprint: false, dive: false, grab: false, pass: false, shoot: false, aim: false, dunk: false, ability: false };
   }
 
   function Sim(opts) {
@@ -120,10 +120,10 @@
       q.vx = 0; q.vy = 0; q.vz = 0; q.grounded = true; q.hidden = false; q.respawnT = 0;
       q.state = 'normal'; q.stateT = 0; q.dunk = null; q.charging = false; q.passHeld = false; q.passAim = -1;
       q.grabbedBy = -1; q.grabTarget = -1; q.callT = 0; q.launchT = 0; q.stunImmune = 0; q.wobble = 0;
-      q.diveCd = 0; q.grabCd = 0; q.throwAnim = 0;
+      q.diveCd = 0; q.grabCd = 0; q.throwAnim = 0; q.abilityT = 0; q.frozenT = 0;
       q.yaw = q.team === 0 ? 0 : Math.PI;
       if (resetStats) {
-        q.celebrateT = 0;
+        q.celebrateT = 0; q.hype = 0;
         q.stats = { pts: 0, dunks: 0, shots: 0, made: 0, passes: 0, steals: 0, tackles: 0, intercepts: 0, assists: 0 };
       }
     }
@@ -199,6 +199,7 @@
       airT: 0, landImpact: 0, sprinting: false, wobble: 0,
       respawnT: 0, hidden: false, dunk: null, throwAnim: 0, throwKind: '',
       celebrateT: 0, moveAmt: 0, stuckT: 0,
+      hype: 0, ability: this._abilityFor(info.team, slot), abilityT: 0, frozenT: 0,
       prev: emptyInput(), input: emptyInput(),
       stats: { pts: 0, dunks: 0, shots: 0, made: 0, passes: 0, steals: 0, tackles: 0, intercepts: 0, assists: 0 }
     };
@@ -206,7 +207,106 @@
     return p;
   };
 
-  Sim.prototype.emit = function (e) { e.time = this.time; this.events.push(e); };
+  /* ---- abilities ---- */
+  Sim.prototype._abilityFor = function (team, slot) {
+    var list = Rules.ARENA_ABILITIES[this.arena.id] || ['bigbean'];
+    return list[(slot + team) % list.length];   // hero city: teammates get different powers
+  };
+  Sim.prototype.abilityOn = function (p, id) { return p.abilityT > 0 && (!id || p.ability === id); };
+  /* can't be knocked down / grabbed / stripped right now */
+  Sim.prototype.hitImmune = function (p) {
+    return p.abilityT > 0 && (p.ability === 'bigbean' || p.ability === 'speed' || p.ability === 'shield');
+  };
+  Sim.prototype.addHype = function (pid, amt) {
+    var p = this.players[pid];
+    if (!p || !this.settings.abilities || p.abilityT > 0 || this.predictOnly) return;
+    p.hype = Math.min(Rules.HYPE.max, p.hype + amt);
+  };
+  Sim.prototype._hypeFromEvent = function (e) {
+    var H = Rules.HYPE;
+    switch (e.t) {
+      case 'pass': this.addHype(e.id, H.pass); break;
+      case 'steal': this.addHype(e.id, H.steal); break;
+      case 'tackle': if (!e.blocked) this.addHype(e.id, H.tackle); break;
+      case 'block': this.addHype(e.id, H.block); break;
+      case 'shoot': this.addHype(e.id, H.shoot); break;
+      case 'dunk': this.addHype(e.id, H.dunk - H.score); break;   // the score event adds the rest
+      case 'score': if (e.scorer >= 0) this.addHype(e.scorer, H.score); if (e.assist >= 0) this.addHype(e.assist, H.assist); break;
+    }
+  };
+
+  Sim.prototype.canUseAbility = function (p) {
+    if (!this.settings.abilities || p.hype < Rules.HYPE.max || p.abilityT > 0 || p.hidden) return false;
+    if (p.state === 'stun' || p.state === 'dunk' || p.grabbedBy >= 0) return false;
+    var ph = this.match.phase;
+    return ph === 'play' || ph === 'buzzer' || (ph === 'warmup' && this.mode !== 'match');
+  };
+
+  Sim.prototype._useAbility = function (p) {
+    var A = Rules.ABILITIES[p.ability] || Rules.ABILITIES.bigbean, id = p.ability, i;
+    p.hype = 0; p.abilityT = A.dur;
+    var fx = Math.sin(p.yaw), fz = Math.cos(p.yaw);
+    if (id === 'jetpack' || id === 'flight') {
+      // launch up and forward; low gravity + strong air control while active
+      p.vy = id === 'flight' ? 15 : 17; p.vx += fx * 6; p.vz += fz * 6;
+      p.grounded = false; p.coyote = 0; p.launchT = 0;
+    } else if (id === 'cannon' || id === 'pound') {
+      var R = id === 'pound' ? 6.5 : 5.5;
+      if (id === 'pound') { p.vy = Math.max(p.vy, 5); p.grounded = false; }
+      for (i = 0; i < this.players.length; i++) {
+        var t = this.players[i];
+        if (t.team === p.team || t.hidden || this.hitImmune(t)) continue;
+        var dx = t.x - p.x, dz = t.z - p.z, d = Math.sqrt(dx * dx + dz * dz);
+        if (d > R || Math.abs(t.y - p.y) > 3) continue;
+        var k = (1 - d / R) * 0.6 + 0.4, l = d || 1;
+        t.vx = dx / l * 13 * k; t.vz = dz / l * 13 * k; t.vy = 6 + 4 * k; t.grounded = false;
+        this._stun(t, 0.8 + 0.4 * k, true);
+        t.wobble = 1.5;
+      }
+    } else if (id === 'freeze') {
+      // the opponent most in front of you (cone), else the nearest close by
+      var best = null, bs = -1e9;
+      for (i = 0; i < this.players.length; i++) {
+        var q = this.players[i];
+        if (q.team === p.team || q.hidden || this.hitImmune(q)) continue;
+        var qx = q.x - p.x, qz = q.z - p.z, qd = Math.sqrt(qx * qx + qz * qz) || 1, cs = (qx * fx + qz * fz) / qd;
+        if (qd > 14 || (cs < 0.55 && qd > 6)) continue;
+        var sc = cs * 2 - qd / 7;
+        if (sc > bs) { bs = sc; best = q; }
+      }
+      if (best) {
+        best.vx *= 0.1; best.vz *= 0.1;
+        this._stun(best, 1.8, true);
+        best.frozenT = 1.8;
+        this.emit({ t: 'frozen', id: best.id, by: p.id });
+      }
+    }
+    if (id === 'shield' || id === 'bigbean' || id === 'speed') { p.stunImmune = Math.max(p.stunImmune, A.dur); }
+    this.emit({ t: 'ability', id: p.id, ability: id });
+  };
+
+  /* per-tick ability effects that don't belong to movement */
+  Sim.prototype._stepAbility = function (p, dt) {
+    if (p.frozenT > 0) p.frozenT = Math.max(0, p.frozenT - dt);
+    if (p.abilityT <= 0) {
+      if (this.settings.abilities && !p.hidden && this.match.phase === 'play' && this.mode === 'match') p.hype = Math.min(Rules.HYPE.max, p.hype + Rules.HYPE.perSec * dt);
+      return;
+    }
+    p.abilityT = Math.max(0, p.abilityT - dt);
+    if (p.ability === 'dash') p.diveCd = 0;
+    if (p.ability === 'magnet' && !this.predictOnly) {
+      var b = this.ball;
+      if (b.state === 'free' && !(b.lastThrow && b.lastThrow.team === p.team && b.inFlight)) {
+        var dx = p.x - b.x, dz = p.z - b.z, dy = (p.y + 1) - b.y, d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (d < 9 && d > 0.3) { var pull = 32 * dt; b.vx += dx / d * pull; b.vy += dy / d * pull + this.gBall * dt * 0.5; b.vz += dz / d * pull; }
+      }
+    }
+  };
+
+  Sim.prototype.emit = function (e) {
+    e.time = this.time; this.events.push(e);
+    if (this.settings.abilities) this._hypeFromEvent(e);
+  };
 
   Sim.prototype.attackHoop = function (team) { return this.hoops[1 - team]; };
   Sim.prototype.ownHoop = function (team) { return this.hoops[team]; };
@@ -473,6 +573,7 @@
       return;
     }
 
+    this._stepAbility(p, dt);
     var frozen = (m.phase === 'countdown');
     if (frozen) { inp = emptyInput(); inp.look = p.yaw; }
     var ended = (m.phase === 'ended');
@@ -562,6 +663,8 @@
       if (pressed('dive') && p.diveCd <= 0 && p.grabbedBy < 0) {
         this._startDive(p);
       }
+      // ability (server decides; prediction just waits for the snapshot)
+      if (auth && pressed('ability') && this.canUseAbility(p)) this._useAbility(p);
     } else {
       p.passAim = -1;
       if (p.state !== 'dunk') { p.charging = false; }
@@ -585,9 +688,17 @@
     if (p.grabTarget >= 0) maxSpeed *= P.grabberMul;
     if (p.grabbedBy >= 0) maxSpeed *= P.grabbedMul;
     if (p.state === 'recover') maxSpeed *= 0.6;
+    // ability movement modifiers
+    var flyer = this.abilityOn(p, 'jetpack') || this.abilityOn(p, 'flight');
+    if (this.abilityOn(p, 'speed')) maxSpeed *= 1.55;
+    else if (this.abilityOn(p, 'dash')) maxSpeed *= 1.45;
+    else if (this.abilityOn(p, 'bigbean')) maxSpeed *= 0.92;
+    else if (flyer) maxSpeed *= 1.25;
 
     var desX = dirX * maxSpeed, desZ = dirZ * maxSpeed;
     var gravity = this.gPlayer;
+    if (flyer) gravity *= (this.abilityOn(p, 'flight') && inp.jump) ? 0.12 : 0.32;   // flight: hold jump to soar
+    else if (this.abilityOn(p, 'moon')) gravity *= 0.55;
 
     if (p.state === 'dunk') {
       this._stepDunk(p, dt);
@@ -608,10 +719,10 @@
     } else {
       var accel;
       if (p.grounded) accel = (mag > 0.05) ? (sprint ? P.accelSprint : P.accelGround) : P.friction;
-      else accel = P.accelAir;
+      else accel = P.accelAir * (flyer ? 3 : 1);
       if (p.grounded && this.arena.ice.length && this.arena.surface(p.x, p.z, this._sf || (this._sf = {})).ice) accel *= (mag > 0.05 ? 0.22 : 0.08); // slippery
       if (p.launchT > 0) accel = 2;
-      if (!p.grounded && mag < 0.05) accel = 2; // keep momentum in air
+      if (!p.grounded && mag < 0.05 && !flyer) accel = 2; // keep momentum in air
       var dvx = desX - p.vx, dvz = desZ - p.vz;
       var dl = Math.sqrt(dvx * dvx + dvz * dvz);
       var maxDv = accel * dt;
@@ -634,7 +745,7 @@
 
       // jump
       if (p.jumpBuf > 0 && (p.grounded || p.coyote > 0) && p.grabbedBy < 0 && (act || (ended && actEnded)) && p.state !== 'recover') {
-        p.vy = P.jumpVel * Math.sqrt(this.physMul.jump);
+        p.vy = P.jumpVel * Math.sqrt(this.physMul.jump) * (this.abilityOn(p, 'moon') ? 1.3 : 1);
         p.grounded = false; p.coyote = 0; p.jumpBuf = 0;
         this.emit({ t: 'jump', id: p.id });
       }
@@ -885,7 +996,7 @@
     for (i = 0; i < this.players.length; i++) {
       var o = this.players[i];
       if (o === p || o.team === p.team || o.hidden) continue;
-      if (o.grabbedBy >= 0 || o.grabImmune > 0 || o.state === 'dunk') continue;
+      if (o.grabbedBy >= 0 || o.grabImmune > 0 || o.state === 'dunk' || this.hitImmune(o)) continue;   // big bean / speed / force field can't be grabbed
       var ox = o.x - p.x, oz = o.z - p.z, oy = o.y - p.y;
       var d = Math.sqrt(ox * ox + oz * oz);
       if (d > P.grabRange || Math.abs(oy) > 1.5) continue;
@@ -920,7 +1031,7 @@
       p.grabT += dt;
       var dx = t.x - p.x, dz = t.z - p.z, d = Math.sqrt(dx * dx + dz * dz);
       var stop = !p.input.grab || p.grabT >= P.grabDuration || d > 2.8 || t.hidden || p.hidden ||
-        (p.state !== 'normal' && p.state !== 'recover') || t.state === 'stun' || t.state === 'dunk' || !this.playActive();
+        (p.state !== 'normal' && p.state !== 'recover') || t.state === 'stun' || t.state === 'dunk' || !this.playActive() || this.hitImmune(t);
       if (stop) { this._releaseGrab(p); continue; }
       // tether: pull target toward grabber's front
       var fx = Math.sin(p.yaw), fz = Math.cos(p.yaw);
@@ -959,10 +1070,21 @@
         var vLim = ((aT && c.state === 'dunk') || (cT && a.state === 'dunk')) ? 3.2 : 1.45;
         if (dy > vLim || dy < -vLim) continue;
         var dx = c.x - a.x, dz = c.z - a.z, d2 = dx * dx + dz * dz;
-        var lim = r2 + ((aT || cT) ? 0.45 : 0);
+        var aBig = this.abilityOn(a, 'bigbean'), cBig = this.abilityOn(c, 'bigbean');
+        var lim = r2 + ((aT || cT) ? 0.45 : 0) + ((aBig || cBig) ? 0.5 : 0);
         if (d2 >= lim * lim) continue;
         var d = Math.sqrt(d2) || 0.001, nx = dx / d, nz = dz / d;
         if (d2 < 0.000001) { nx = 1; nz = 0; }
+
+        // Big Bean bowls over any opponent it runs into
+        if (a.team !== c.team && !this.predictOnly && (aBig !== cBig)) {
+          var big = aBig ? a : c, small = aBig ? c : a, sgn = aBig ? 1 : -1;
+          if (!this.hitImmune(small) && small.stunImmune <= 0 && small.state !== 'stun') {
+            small.vx = nx * sgn * 9 + big.vx * 0.5; small.vz = nz * sgn * 9 + big.vz * 0.5; small.vy = 5; small.grounded = false;
+            this._stun(small, 0.7, true);
+            this.emit({ t: 'tackle', id: big.id, target: small.id, strength: 9, fumble: false, bowl: true });
+          }
+        }
 
         if (a.team !== c.team && (aT || cT)) {
           var aDive = aT, cDive = cT;
@@ -1014,7 +1136,7 @@
     var strength = impact * this.settings.tackleStrength * scale;
     if (t.state === 'dunk' || (t.autoDunk && this.ball.holder === t.id)) this.emit({ t: 'block', id: a.id, target: t.id, kind: 'dunk' });
     var carrier = this.ball.holder === t.id;
-    if (t.stunImmune > 0 || t.state === 'stun') {
+    if (t.stunImmune > 0 || t.state === 'stun' || this.hitImmune(t)) {
       // protected: just a shove
       t.vx += nx * strength * 0.35; t.vz += nz * strength * 0.35;
       t.wobble = Math.max(t.wobble, 0.8);
@@ -1611,6 +1733,7 @@
       if (!ignored && this.canCatch(p)) {
         var cr = (b.passTarget === p.id) ? P.catchRadiusTarget : P.catchRadius;
         if (p.state === 'dive') cr += 0.35;
+        if (this.abilityOn(p, 'magnet')) cr += 1.3;
         cr += (R - B.radius);
         if (d < cr && d < bestD) { bestD = d; best = p; }
       } else if (!ignored) {

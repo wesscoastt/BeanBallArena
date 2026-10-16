@@ -397,7 +397,7 @@
     G.sim = new BBA.Sim({
       roster: roster, mode: 'match', seed: (r() * 1e9) | 0, countdown: 3.5, warmup: wu,
       settings: { duration: setup.duration || 240, difficulty: setup.difficulty || 'normal', modifier: setup.modifier || 'none', teamSize: size, arena: setup.arena || 'bean_bowl',
-        mercyLead: setup.mercyLead === undefined ? 12 : setup.mercyLead, kickoffReset: setup.kickoffReset !== false }
+        mercyLead: setup.mercyLead === undefined ? 12 : setup.mercyLead, kickoffReset: setup.kickoffReset !== false, abilities: setup.abilities !== false }
     });
     G.ai = new BBA.AI(G.sim);
     for (i = 1; i < roster.length; i++) G.ai.addBot(i, setup.difficulty || 'normal');
@@ -520,7 +520,7 @@
     inp.mz = fz * ctl.my + rz * ctl.mx;
     var h = ctl.held;
     inp.jump = h.jump; inp.sprint = h.sprint; inp.dive = h.dive; inp.grab = h.grab;
-    inp.pass = h.pass; inp.shoot = h.shoot; inp.aim = h.aim; inp.dunk = h.dunk;
+    inp.pass = h.pass; inp.shoot = h.shoot; inp.aim = h.aim; inp.dunk = h.dunk; inp.ability = h.ability;
     return inp;
   };
 
@@ -867,6 +867,31 @@
         case 'fumble': if (p && !menu) G.snd('fumble', p.x, p.y, p.z); break;
         case 'call':
           if (p && !menu && p.team === localTeam && !G._isLocal(p.id)) { G.snd('call', p.x, p.y, p.z); }
+          break;
+        case 'ability':
+          if (p) {
+            var AB = Rules.ABILITIES[e.ability] || {};
+            var acol = AB.color || '#ffd23f';
+            if (e.ability === 'cannon' || e.ability === 'pound') {
+              G.fx.burst('slam', p.x, p.y + 0.3, p.z, { color: acol });
+              if (G._isLocal(e.id) || hyp(G.camera.position.x - p.x, G.camera.position.z - p.z) < 18) G.rig.addTrauma(0.5);
+              if (!menu) G.snd('dunk', p.x, p.y, p.z, { vol: 0.7 });
+            } else {
+              G.fx.burst('pad', p.x, p.y + 0.2, p.z, { color: acol });
+              if (!menu) G.snd(e.ability === 'jetpack' || e.ability === 'flight' ? 'launch' : 'pad', p.x, p.y, p.z);
+            }
+            G.fx.burst('confetti', p.x, p.y + 2, p.z, { n: 18, colors: [acol, '#ffffff'] });
+            if (!menu) {
+              var mineA = G._isLocal(e.id);
+              if (mineA || p.team === localTeam) UI.banner(AB.name || 'POWER!', esc(p.name), 'dunk ' + (p.team === 0 ? 'blue' : 'red'));
+              UI.feed('<b style="color:' + G.teamCss[p.team] + '">' + esc(p.name) + '</b> used <b style="color:' + acol + '">' + (AB.name || 'a power') + '</b>');
+              if (mineA) BBA.Controls.rumble(0.6, 180);
+            }
+            G.arena.hype(0.5);
+          }
+          break;
+        case 'frozen':
+          if (p) { G.fx.burst('poof', p.x, p.y + 0.8, p.z, { color: '#8be0ff' }); if (!menu) G.snd('steal', p.x, p.y, p.z); }
           break;
         case 'block':
           if (p) {

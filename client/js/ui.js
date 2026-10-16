@@ -293,7 +293,7 @@
     box.innerHTML = '';
     function save() { BBA.Settings.save(); UI.teamsPreview(); }
     box.appendChild(UI.choice('ARENA', BBA.Arenas.list.map(function (a) { return [a.id, a.name]; }), function () { return L.arena || 'bean_bowl'; },
-      function (v) { L.arena = v; save(); UI.G.menuArena = v; UI.buildArenaRow(); UI.buildSetup(); }, BBA.Arenas.list.filter(function (a) { return a.id === (L.arena || 'bean_bowl'); })[0].blurb));
+      function (v) { L.arena = v; save(); UI.G.menuArena = v; UI.buildArenaRow(); UI.buildSetup(); }, BBA.Arenas.list.filter(function (a) { return a.id === (L.arena || 'bean_bowl'); })[0].blurb + ' Power: ' + (BBA.Rules.ARENA_ABILITIES[L.arena || 'bean_bowl'] || ['bigbean']).map(function (k) { return BBA.Rules.ABILITIES[k].name; }).join(', ')));
     var maxT = BBA.Arenas.get(L.arena || 'bean_bowl').maxTeam || 3, sizes = [];
     for (var ts = 1; ts <= maxT; ts++) sizes.push([ts, ts + ' v ' + ts]);
     if (L.teamSize > maxT) L.teamSize = maxT;
@@ -304,6 +304,7 @@
       function () { return L.warmup === undefined ? 45 : L.warmup; }, function (v) { L.warmup = v; save(); }, 'Practice on the court before the match starts'));
     box.appendChild(UI.choice('MERCY RULE', [[0, 'Off'], [8, 'Lead by 8'], [10, 'Lead by 10'], [12, 'Lead by 12'], [15, 'Lead by 15']],
       function () { return L.mercyLead === undefined ? 12 : L.mercyLead; }, function (v) { L.mercyLead = v; save(); }, 'A team that gets this far ahead wins right away'));
+    box.appendChild(UI.choice('ABILITIES', [[true, 'On'], [false, 'Off']], function () { return L.abilities !== false; }, function (v) { L.abilities = v; save(); }, 'Fill your Hype meter, then unleash the power of this arena'));
     box.appendChild(UI.choice('AFTER A SCORE', [[true, 'Reset to decks'], [false, 'Keep playing']],
       function () { return L.kickoffReset !== false; }, function (v) { L.kickoffReset = v; save(); }, 'Everyone drops from their deck again after each basket'));
     box.appendChild(UI.choice('MODIFIER', [['none', 'None (standard)'], ['superbounce', 'Super Bounce'], ['lowgravity', 'Low Gravity'], ['heavyball', 'Heavy Ball'], ['megaball', 'Mega Ball'], ['turbo', 'Turbo']],
@@ -408,10 +409,10 @@
       box.appendChild(UI.choice('AIM ASSIST (pad/touch)', [['strong', 'Strong'], ['normal', 'Normal'], ['off', 'Off']], function () { return S.aimAssist || 'normal'; }, function (v) { S.aimAssist = v; save(); }, 'While charging a shot, the camera turns toward the hoop'));
       box.appendChild(el('div', 'orow', '<div class="olab" style="color:#ffc93c">KEYBOARD + MOUSE</div>'));
       var acts = [['forward', 'Move forward'], ['back', 'Move back'], ['left', 'Move left'], ['right', 'Move right'], ['jump', 'Jump'], ['sprint', 'Sprint'], ['dive', 'Dive / tackle'],
-        ['grab', 'Grab / pick up'], ['shoot', 'Shoot (hold)'], ['dunk', 'Dunk (near the hoop)'], ['pass', 'Pass / call for pass'], ['aim', 'Aim'], ['ballcam', 'Ball camera'], ['pause', 'Pause']];
+        ['grab', 'Grab / pick up'], ['shoot', 'Shoot (hold)'], ['dunk', 'Dunk (near the hoop)'], ['ability', 'Ability (Hype full)'], ['pass', 'Pass / call for pass'], ['aim', 'Aim'], ['ballcam', 'Ball camera'], ['pause', 'Pause']];
       for (var a = 0; a < acts.length; a++) box.appendChild(UI.bindRow(acts[a][0], acts[a][1], 'key'));
       box.appendChild(el('div', 'orow', '<div class="olab" style="color:#ffc93c">CONTROLLER</div><div class="odesc">Xbox / PlayStation / Android handhelds</div>'));
-      var pacts = [['jump', 'Jump'], ['sprint', 'Sprint'], ['dive', 'Dive / tackle'], ['grab', 'Grab / pick up'], ['shoot', 'Shoot (hold)'], ['dunk', 'Dunk'], ['pass', 'Pass / call'], ['aim', 'Aim (+Grab = shoot)'], ['ballcam', 'Ball camera'], ['pause', 'Pause']];
+      var pacts = [['jump', 'Jump'], ['sprint', 'Sprint'], ['dive', 'Dive / tackle'], ['grab', 'Grab / pick up'], ['shoot', 'Shoot (hold)'], ['dunk', 'Dunk'], ['ability', 'Ability'], ['pass', 'Pass / call'], ['aim', 'Aim (+Grab = shoot)'], ['ballcam', 'Ball camera'], ['pause', 'Pause']];
       for (a = 0; a < pacts.length; a++) box.appendChild(UI.bindRow(pacts[a][0], pacts[a][1], 'pad'));
     } else if (tab === 'mobile') {
       box.appendChild(UI.slider('BUTTON SIZE', 0.7, 1.5, 0.05, function () { return S.touchSize; }, function (v) { S.touchSize = v; save(); BBA.Controls.applyTouchLayout(); }, pct));
@@ -486,7 +487,7 @@
     function pn(a) { return g.padButtonName(S.pad[a]); }
     var acts = [['Move', 'WASD', 'Left stick', 'Left thumb'], ['Camera', 'Mouse', 'Right stick', 'Drag right side'], ['Jump', kn('jump'), pn('jump'), 'Jump'],
       ['Sprint', kn('sprint'), pn('sprint') + ' / L3', 'Push stick 80%+'], ['Dive / tackle', kn('dive'), pn('dive'), 'Dive'], ['Grab / pick up', kn('grab'), pn('grab'), 'Grab'],
-      ['Shoot (hold)', kn('shoot'), pn('shoot') + ' or ' + pn('aim') + '+' + pn('grab'), 'Shoot'], ['Dunk (near the hoop)', kn('dunk'), pn('dunk'), 'Dunk'], ['Pass (tap) / aimed pass (hold)', kn('pass'), pn('pass'), 'Pass'],
+      ['Shoot (hold)', kn('shoot'), pn('shoot') + ' or ' + pn('aim') + '+' + pn('grab'), 'Shoot'], ['Dunk (near the hoop)', kn('dunk'), pn('dunk'), 'Dunk'], ['Ability (Hype full)', kn('ability'), pn('ability'), 'Power'], ['Pass (tap) / aimed pass (hold)', kn('pass'), pn('pass'), 'Pass'],
       ['Call for pass', kn('pass') + ' (no ball)', pn('pass') + ' (no ball)', 'Pass (no ball)'], ['Ball camera', kn('ballcam'), pn('ballcam'), 'Ball'], ['Pause', kn('pause'), pn('pause'), 'II']];
     var cols = ['KEYBOARD + MOUSE', 'CONTROLLER', 'TOUCH'], html = '', c, i;
     for (c = 0; c < 3; c++) {
@@ -495,7 +496,7 @@
       html += '</div>';
     }
     html += '<div class="help-tips"><b>Tips:</b> Get close to the enemy hoop with the ball and press Dunk: you leap to the rim and slam it (it lights up when you\'re in range). Bounce pads and the launch pads on the side platforms make dunks easy. ' +
-      'Shots from outside the painted arc are worth 3. Dive into anyone to tackle them: it knocks the ball loose, swats away fresh shots and stuffs dunks. Grab and hold a carrier to steal it. Tap Pass without the ball to call for it.</div>';
+      'Shots from outside the painted arc are worth 3. Dive into anyone to tackle them: it knocks the ball loose, swats away fresh shots and stuffs dunks. Grab and hold a carrier to steal it. Tap Pass without the ball to call for it. Abilities: everything you do fills your Hype meter; when it is full press Ability to unleash the arena power (Hero City gives everyone a superhero power).</div>';
     $('help-grid').innerHTML = html;
   };
 
@@ -565,6 +566,32 @@
     return m + ':' + (s < 10 ? '0' : '') + s;
   }
   function key(a) { return '<span class="key">' + BBA.Controls.glyph(a) + '</span>'; }
+
+  /* Hype meter: fills as you play; full = press Ability. While active it shows time left. */
+  UI._updateHype = function (G, sim, lp) {
+    var box = $('hype'), on = !!sim.settings.abilities && !lp.hidden && sim.match.phase !== 'ended';
+    box.classList.toggle('hidden', !on);
+    var tb = BBA.Controls.touchBtnEls && BBA.Controls.touchBtnEls.ability;
+    if (tb) tb.style.display = on ? '' : 'none';
+    if (!on) return;
+    var A = BBA.Rules.ABILITIES[lp.ability] || BBA.Rules.ABILITIES.bigbean;
+    var active = lp.abilityT > 0, ready = !active && lp.hype >= BBA.Rules.HYPE.max;
+    var pct = active ? lp.abilityT / A.dur * 100 : lp.hype;
+    var sig = A.name + '|' + Math.round(pct) + '|' + ready + '|' + active + '|' + BBA.Controls.device;
+    if (box._sig === sig) return;
+    box._sig = sig;
+    box.style.setProperty('--hy', A.color);
+    $('hy-fill').style.width = pct.toFixed(0) + '%';
+    $('hy-name').textContent = A.name;
+    $('hy-state').innerHTML = active ? 'ACTIVE' : (ready ? 'READY! ' + key('ability') : Math.floor(lp.hype) + '%');
+    box.classList.toggle('ready', ready); box.classList.toggle('active', active);
+    if (tb) {
+      tb.classList.toggle('ready', ready);
+      tb.style.setProperty('--hy', A.color);
+      tb.style.background = 'conic-gradient(' + A.color + ' ' + pct.toFixed(0) + '%, rgba(20,26,80,.62) 0)';
+      var lab = tb.querySelector('.tl'); if (lab && lab.textContent !== A.short) lab.textContent = A.short;
+    }
+  };
 
   UI.updateHUD = function (G, sim, lp, ball, dt) {
     var m = sim.match, b = sim.ball;
@@ -656,6 +683,10 @@
       BBA.Controls.touchBtnEls.shoot.classList.toggle('hot', hasBall);
       BBA.Controls.touchBtnEls.pass.classList.toggle('hot', hasBall);
       if (BBA.Controls.touchBtnEls.dunk) BBA.Controls.touchBtnEls.dunk.classList.toggle('ready', !!dunkReady);
+    }
+    // hype meter + ability button
+    UI._updateHype(G, sim, lp);
+    if (BBA.Controls.touchBtnEls) {
     }
     // hints fade
     $('hints').style.opacity = UI.hintT < 25 ? 0.85 : 0;

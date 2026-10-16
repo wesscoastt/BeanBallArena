@@ -35,7 +35,7 @@ function Match(room, io) {
   this.sim = new Sim({
     roster: roster, mode: 'match', seed: this.seed, countdown: 4, warmup: s.warmup < 0 ? 180 : (s.warmup || 0),
     settings: {
-      arena: s.arena, duration: s.duration, scoreLimit: s.scoreLimit, mercyLead: s.mercyLead, kickoffReset: s.kickoffReset,
+      arena: s.arena, duration: s.duration, scoreLimit: s.scoreLimit, mercyLead: s.mercyLead, kickoffReset: s.kickoffReset, abilities: s.abilities,
       overtime: s.overtime, difficulty: s.difficulty, teamSize: s.teamSize,
       tackleStrength: s.tackleStrength, ballWeight: s.ballWeight, gravity: s.gravity, jumpHeight: s.jumpHeight,
       respawnTime: s.respawnTime, obstacles: s.obstacles, modifier: s.modifier

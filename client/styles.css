@@ -333,3 +333,17 @@ body.podium #scorebar, body.podium #radar, body.podium #prompt, body.podium #hin
 #scr-results.podium .res-table { max-height: 22vh; }
 #scr-results.podium .res-table td { padding: 3px 4px; font-size: 13px; }
 @media (max-height: 450px) { #scr-results.podium .res-table { display: none; } }
+
+/* ---- Hype meter + ability (Crown Jam style) ---- */
+#hype { position: absolute; left: max(14px, env(safe-area-inset-left)); bottom: 118px; width: 190px; pointer-events: none; font-family: var(--font-h); }
+#hype.hidden { display: none; }
+#hype .hy-bar { height: 12px; border-radius: 8px; background: rgba(10,14,50,.6); border: 2px solid rgba(255,255,255,.35); overflow: hidden; }
+#hype .hy-fill { height: 100%; width: 0%; background: var(--hy, #ffd23f); transition: width .15s; }
+#hype .hy-txt { display: flex; justify-content: space-between; margin-top: 3px; font-size: 13px; color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,.5); }
+#hype.ready .hy-bar { border-color: var(--hy, #ffd23f); box-shadow: 0 0 12px var(--hy, #ffd23f); animation: hyPulse .8s infinite alternate; }
+#hype.ready #hy-state { color: var(--hy, #ffd23f); }
+#hype.active .hy-fill { background: #ffffff; }
+@keyframes hyPulse { from { transform: scale(1); } to { transform: scale(1.04); } }
+body.touch-on #hype { bottom: auto; top: 64px; left: 50%; margin-left: -95px; }
+.tbtn-ability { opacity: .55; }
+.tbtn-ability.ready { opacity: 1; border-color: var(--hy, #ffd23f); box-shadow: 0 0 18px var(--hy, #ffd23f); }

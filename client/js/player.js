@@ -66,6 +66,7 @@
     ch.ring.visible = y - gh < 6;
     var rs = 1 + Math.min(0.8, (y - gh) * 0.08);
     ch.ring.scale.set(rs * (this.local ? 1.15 : 1), rs * (this.local ? 1.15 : 1), 1);
+    this._abilityFx(dt, p);
 
     var speed = Math.sqrt(p.vx * p.vx + p.vz * p.vz);
     var accel = dt > 0 ? (speed - this.lastSpeed) / dt : 0;
@@ -140,6 +141,39 @@
     tag.classList.add('podium');
     tag.style.opacity = 1;
     tag.style.transform = 'translate(' + Math.round(sx) + 'px,' + Math.round(sy) + 'px) translate(-50%,-100%)';
+  };
+
+  /* Ability visuals: Big Bean grows, active powers glow in their color, the Force
+   * Field is a visible bubble, and a frozen player is stuck in an ice block. */
+  PlayerView.prototype._abilityFx = function (dt, p) {
+    var ch = this.ch, ab = p.abilityT > 0 ? p.ability : '', A = ab ? (BBA.Rules.ABILITIES[ab] || null) : null;
+    this.scl = this.scl || 1;
+    var want = ab === 'bigbean' ? 1.6 : 1;
+    this.scl += (want - this.scl) * Math.min(1, dt * 7);
+    if (Math.abs(this.scl - 1) > 0.001 || ch.root.scale.x !== 1) ch.root.scale.setScalar(this.scl);   // grows from the feet
+    var showAura = !!A && ab !== 'cannon' && ab !== 'pound' && ab !== 'freeze';
+    if (showAura && !this.aura) {
+      this.aura = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.2, depthWrite: false, blending: THREE.AdditiveBlending }));
+      this.aura.position.y = 0.9; this.aura.scale.set(0.95, 1.2, 0.95);
+      ch.root.add(this.aura);
+    }
+    if (this.aura) {
+      this.aura.visible = showAura;
+      if (showAura) {
+        this.aura.material.color.set(A.color);
+        var t = performance.now() * 0.006, shield = ab === 'shield';
+        this.aura.material.opacity = (shield ? 0.32 : 0.16) + Math.sin(t) * 0.06;
+        var s = shield ? 1.25 : 1.0;
+        this.aura.scale.set(0.95 * s, 1.2 * s, 0.95 * s);
+        this.aura.position.y = 0.9;
+      }
+    }
+    var frozen = p.frozenT > 0;
+    if (frozen && !this.ice) {
+      this.ice = new THREE.Mesh(new THREE.BoxGeometry(1.5, 2.1, 1.5), new THREE.MeshLambertMaterial({ color: '#bfefff', transparent: true, opacity: 0.55, emissive: '#3a8ab0', emissiveIntensity: 0.4, depthWrite: false }));
+      this.ice.position.y = 1.0; ch.root.add(this.ice);
+    }
+    if (this.ice) this.ice.visible = frozen;
   };
 
   PlayerView.prototype.dispose = function () {

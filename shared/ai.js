@@ -326,7 +326,7 @@
     var sim = this.sim, p = sim.players[br.pid], inp = br.input;
     var k;
     for (k in br.cool) if (br.cool[k] > 0) br.cool[k]--;
-    inp.jump = false; inp.dive = false; inp.pass = false; inp.shoot = false; inp.grab = false; inp.aim = false;
+    inp.jump = false; inp.dive = false; inp.pass = false; inp.shoot = false; inp.grab = false; inp.aim = false; inp.ability = false; inp.dunk = false;
     if (!p || p.hidden || br.passive) { inp.mx = 0; inp.mz = 0; return inp; }
 
     var m = sim.match;
@@ -373,9 +373,37 @@
       }
     }
 
+    this._maybeAbility(br, p, dt, hasBall);
     this._steer(br, p, dt);
     this._emitPulses(br, inp);
     return inp;
+  };
+
+  /* Bots use their ability when it actually helps (with a human-ish delay; the sweat
+   * fires instantly). If it's been full for a while they just use it. */
+  AI.prototype._maybeAbility = function (br, p, dt, hasBall) {
+    var sim = this.sim;
+    if (!sim.canUseAbility(p)) { br.fullT = 0; return; }
+    br.fullT = (br.fullT || 0) + dt;
+    if (br.fullT < (br.sweat ? 0.1 : 0.8)) return;
+    var b = sim.ball, id = p.ability, use = false, i;
+    var atk = sim.attackHoop(p.team), dAtk = hyp(atk.x - p.x, atk.z - p.z);
+    var c = b.holder >= 0 ? sim.players[b.holder] : null, enemyC = c && c.team !== p.team ? c : null;
+    var dEnemy = enemyC ? hyp(enemyC.x - p.x, enemyC.z - p.z) : 1e9;
+    if (id === 'speed' || id === 'dash' || id === 'shield') use = hasBall && dAtk < 24;
+    else if (id === 'bigbean') use = (hasBall && dAtk < 22) || dEnemy < 5;
+    else if (id === 'jetpack' || id === 'flight') use = hasBall && dAtk < 15 && p.grounded;
+    else if (id === 'moon') use = hasBall && dAtk < 18;
+    else if (id === 'magnet') use = b.state === 'free' && hyp(b.x - p.x, b.z - p.z) < 9;
+    else if (id === 'cannon' || id === 'pound') {
+      var near = 0, opp = this._opponents(p.team);
+      for (i = 0; i < opp.length; i++) if (!opp[i].hidden && hyp(opp[i].x - p.x, opp[i].z - p.z) < 5) near++;
+      use = dEnemy < 4.5 || near >= 2;
+    } else if (id === 'freeze') {
+      if (enemyC && dEnemy < 11) { br.look = Math.atan2(enemyC.x - p.x, enemyC.z - p.z); use = br.fullT > 1.1; }
+    }
+    if (br.fullT > 12) use = true;
+    if (use) this._pulse(br, 'ability');
   };
 
   AI.prototype._emitPulses = function (br, inp) {

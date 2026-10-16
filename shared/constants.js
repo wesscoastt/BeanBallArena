@@ -113,6 +113,6 @@
     },
 
     // Input button names (shared with network protocol)
-    BUTTONS: ['jump', 'sprint', 'dive', 'grab', 'pass', 'shoot', 'aim', 'dunk']
+    BUTTONS: ['jump', 'sprint', 'dive', 'grab', 'pass', 'shoot', 'aim', 'dunk', 'ability']
   };
 });
