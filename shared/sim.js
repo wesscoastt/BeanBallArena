@@ -533,7 +533,7 @@
   };
 
   Sim.prototype._blocked = function (x, z, y, sx, sz, grounded) {
-    var g = this.arena.groundHeight, r = P.radius, lim = y + (grounded ? P.stepUp : 0.15);
+    var g = this.arena.groundHeight, r = P.radius, lim = y + (grounded ? P.stepUp : 0.05);   // mid-air: feet must clear the ledge
     if (sx !== 0) {
       var ex = x + sx * r;
       if (g(ex, z) > lim || g(x + sx * r * 0.7, z + r * 0.7) > lim || g(x + sx * r * 0.7, z - r * 0.7) > lim) return true;
@@ -1597,7 +1597,7 @@
     }
 
     // hoops: backboard + rim + scoring
-    for (i = 0; i < 2; i++) this._ballHoop(b, this.hoops[i], live);
+    for (i = 0; i < 2; i++) this._ballHoop(b, this.hoops[i], live, dt);
 
     // final containment
     if (b.x > lx) b.x = lx; if (b.x < -lx) b.x = -lx;
@@ -1614,7 +1614,7 @@
     this.emit({ t: 'ballHit', kind: kind, v: v, x: b.x, y: b.y, z: b.z });
   };
 
-  Sim.prototype._ballHoop = function (b, h, live) {
+  Sim.prototype._ballHoop = function (b, h, live, dt) {
     var R = this.ballRadius;
     // backboard box
     var z0 = h.boardZ, z1 = h.boardZ + h.side * h.boardThick;
@@ -1632,6 +1632,20 @@
         if (-vn > 1.5) this._ballHit(b, live, 'board', -vn);
         b.vx -= (1 + B.restBoard) * vn * nx; b.vy -= (1 + B.restBoard) * vn * ny; b.vz -= (1 + B.restBoard) * vn * nz;
       }
+    }
+    dt = dt || 1 / 60;
+    var fx0 = b.x - h.x, fz0 = b.z - h.z, fd = Math.sqrt(fx0 * fx0 + fz0 * fz0) || 0.001;
+    // funnel: a ball dropping onto the hoop near the rim's edge gets nudged toward the
+    // middle (fewer heartbreak rattle-outs; clean misses still miss)
+    if (b.state === 'free' && b.vy < 0 && b.y > h.y - 0.1 && b.y < h.y + 1.3 && fd < h.ringR + R * 0.7) {
+      var pull = 7 * Math.min(1, fd / h.ringR) * dt;
+      b.vx -= fx0 / fd * pull; b.vz -= fz0 / fd * pull;
+    }
+    // through the net: once it's in, the net catches it and it drops straight down
+    if (b.scoredT !== undefined && this.time - b.scoredT < 0.9 && b.y < h.y + 0.2 && b.y > h.y - 1.8 && fd < h.ringR + 0.3) {
+      var damp = Math.exp(-9 * dt);
+      b.vx = b.vx * damp - fx0 * 4 * dt; b.vz = b.vz * damp - fz0 * 4 * dt;
+      if (b.vy < -6) b.vy = -6;
     }
     // rim (torus as circle)
     var rx = b.x - h.x, rz = b.z - h.z, rl = Math.sqrt(rx * rx + rz * rz);
@@ -1652,8 +1666,8 @@
     // scoring: crossing ring plane downward inside the ring
     if (live && b.prevY >= h.y && b.y < h.y && b.vy < 0) {
       var sx = b.x - h.x, sz = b.z - h.z;
-      if (sx * sx + sz * sz < (h.ringR - R * 0.35) * (h.ringR - R * 0.35)) {
-        if (b.state === 'free') this._basket(h);
+      if (sx * sx + sz * sz < (h.ringR - R * 0.1) * (h.ringR - R * 0.1)) {
+        if (b.state === 'free') { b.scoredT = this.time; this._basket(h); }
       }
     }
   };
@@ -1734,6 +1748,8 @@
         var cr = (b.passTarget === p.id) ? P.catchRadiusTarget : P.catchRadius;
         if (p.state === 'dive') cr += 0.35;
         if (this.abilityOn(p, 'magnet')) cr += 1.3;
+        // loose ball (rolling / bouncing, not a pass or shot): walk over it and it's yours, no button needed
+        if (!b.inFlight && b.state === 'free') cr = Math.max(cr, P.reach * 0.85);
         cr += (R - B.radius);
         if (d < cr && d < bestD) { bestD = d; best = p; }
       } else if (!ignored) {

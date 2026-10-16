@@ -40,14 +40,14 @@
     // beatable by new players, with Hard kept for people who want a fight.
     // humanEase: how much bots hold back on tackles/steals against a HUMAN carrier (0 = none)
     easy: {
-      react: 0.55, shotErr: 0.24, yawErr: 0.14, passErr: 1.2,
-      aggression: 0.2, block: 0.1, intercept: 0.12, sprintUse: 0.4,
-      dodge: 0.08, passSense: 0.35, shotRangeMul: 0.8, callPass: 0.8, humanEase: 0.5
+      react: 0.62, shotErr: 0.28, yawErr: 0.16, passErr: 1.35,
+      aggression: 0.15, block: 0.08, intercept: 0.08, sprintUse: 0.35,
+      dodge: 0.06, passSense: 0.3, shotRangeMul: 0.8, callPass: 0.8, humanEase: 0.55
     },
     normal: {
-      react: 0.4, shotErr: 0.17, yawErr: 0.09, passErr: 0.7,
-      aggression: 0.36, block: 0.25, intercept: 0.26, sprintUse: 0.6,
-      dodge: 0.2, passSense: 0.55, shotRangeMul: 0.95, callPass: 0.65, humanEase: 0.35
+      react: 0.47, shotErr: 0.2, yawErr: 0.1, passErr: 0.8,
+      aggression: 0.3, block: 0.2, intercept: 0.2, sprintUse: 0.55,
+      dodge: 0.18, passSense: 0.5, shotRangeMul: 0.92, callPass: 0.65, humanEase: 0.42
     },
     hard: {
       react: 0.11, shotErr: 0.065, yawErr: 0.025, passErr: 0.15,
@@ -83,8 +83,8 @@
    * and now and then one bot in a match is a "sweat" who plays a level up.
    * sweatChance: per match; sweatAs: the difficulty that sweat plays at. */
   R.LOBBY = {
-    easy:   { spread: 0.25, sweatChance: 0.15, sweatAs: 'normal' },
-    normal: { spread: 0.25, sweatChance: 0.25, sweatAs: 'hard' },
+    easy:   { spread: 0.25, sweatChance: 0.12, sweatAs: 'normal' },
+    normal: { spread: 0.25, sweatChance: 0.2, sweatAs: 'hard' },
     hard:   { spread: 0.1,  sweatChance: 0,    sweatAs: 'hard' }
   };
 

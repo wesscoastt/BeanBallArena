@@ -27,7 +27,7 @@
       turnWalk: 15,
       turnSprint: 6.5,
       turnAim: 20,
-      jumpVel: 11.5,
+      jumpVel: 12.0,       // ~9% higher apex than 11.5 (platforms still need the ramps)
       gravity: 30,
       stepUp: 0.45,
       coyote: 0.1,
@@ -66,7 +66,7 @@
       gravity: 24,
       restFloor: 0.62,
       restWall: 0.72,
-      restRim: 0.55,
+      restRim: 0.42,       // less bouncy rim: fewer rattle-outs
       restBoard: 0.6,
       restPlayer: 0.45,
       rollFriction: 1.6,
@@ -75,7 +75,7 @@
     },
 
     SHOT: {
-      chargeTime: 1.15,
+      chargeTime: 1.6,     // slower fill = easier to time the release
       angleLow: 1.22,
       angleHigh: 0.74,
       speedLow: 11,

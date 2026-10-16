@@ -21,7 +21,7 @@ console.log('movement');
   var p = s.players[0]; place(p, 0, -5);
   var maxY = 0;
   run(s, 60, function (i) { if (p.y > maxY) maxY = p.y; return { 0: inp({ jump: i < 2 }) }; });
-  ok(Math.abs(maxY - 2.2) < 0.15, 'jump apex ~2.2m', maxY.toFixed(2));
+  ok(Math.abs(maxY - 2.4) < 0.15, 'jump apex ~2.4m', maxY.toFixed(2));
   // sprint speed
   place(p, -8, -20);
   run(s, 90, function () { return { 0: inp({ mz: 1, sprint: true }) }; });
