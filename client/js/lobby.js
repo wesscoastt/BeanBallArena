@@ -107,7 +107,7 @@
       st.teams[t].forEach(function (s) {
         if (s.kind === 'human') {
           html += '<div class="slot' + (s.pub === Net.pub ? ' me' : '') + '"><span class="dot" style="background:' + esc(s.color) + '"></span>' +
-            (s.host ? '&#9819; ' : '') + esc(s.name) + (s.pub === Net.pub ? ' (you)' : '') +
+            (s.host ? BBA.Icons.svg('crown') + ' ' : '') + esc(s.name) + (s.pub === Net.pub ? ' (you)' : '') +
             '<span class="tag">' + (!s.connected ? 'reconnecting' : (s.host ? 'HOST' : (s.ready ? 'READY' : 'not ready'))) + '</span></div>';
         } else if (s.kind === 'bot') html += '<div class="slot bot">BOT ' + esc(s.name) + '</div>';
         else if (s.kind === 'autobot') html += '<div class="slot bot dim">BOT (auto-fill)</div>';

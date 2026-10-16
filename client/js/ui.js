@@ -99,7 +99,7 @@
     var row = $('arena-row'), list = BBA.Arenas.list, cur = BBA.Settings.data.lastSetup.arena || 'bean_bowl';
     row.innerHTML = '';
     list.forEach(function (a) {
-      var t = el('button', 'atile' + (a.id === cur ? ' sel' : ''), UI.G.esc(a.name) + (a.id === cur ? '<span class="chk">&#10003;</span>' : ''));
+      var t = el('button', 'atile' + (a.id === cur ? ' sel' : ''), UI.G.esc(a.name) + (a.id === cur ? '<span class="chk">' + BBA.Icons.svg('check') + '</span>' : ''));
       var th = UI.G.arenaThumbs && UI.G.arenaThumbs[a.id];
       t.style.background = th ? 'url(' + th + ') center / cover, ' + (ARENA_BG[a.id] || '#333') : (ARENA_BG[a.id] || '#333');
       if (a.maxTeam > 3) t.innerHTML += '<span class="big">5v5</span>';
@@ -226,7 +226,7 @@
   UI.choice = function (label, values, get, set, desc) {
     var r = row(label, desc);
     var box = el('div', 'ochoose');
-    var lb = el('button', 'oarr', '&#9664;'), val = el('span', 'oval'), rb = el('button', 'oarr', '&#9654;');
+    var lb = el('button', 'oarr', BBA.Icons.svg('left')), val = el('span', 'oval'), rb = el('button', 'oarr', BBA.Icons.svg('right'));
     box.appendChild(lb); box.appendChild(val); box.appendChild(rb); r.appendChild(box);
     function idx() { var v = get(), i; for (i = 0; i < values.length; i++) if (values[i][0] === v) return i; return 0; }
     function render() { val.textContent = values[idx()][1]; }
@@ -629,7 +629,7 @@
       $('wu-sub').textContent = sub;
       var rb = $('wu-ready');
       rb.style.display = free ? 'none' : '';
-      var lbl = mine ? 'READY ✓' : "I'M READY" + (BBA.Controls.device === 'touch' ? '' : ' (' + (BBA.Controls.device === 'pad' ? BBA.Controls.padButtonName(BBA.Settings.data.pad.ready) : 'Enter') + ')');
+      var lbl = mine ? 'READY!' : "I'M READY" + (BBA.Controls.device === 'touch' ? '' : ' (' + (BBA.Controls.device === 'pad' ? BBA.Controls.padButtonName(BBA.Settings.data.pad.ready) : 'Enter') + ')');
       if (rb.textContent !== lbl) rb.textContent = lbl;
       rb.classList.toggle('on', !!mine);
     } else wb.classList.add('hidden');
@@ -772,7 +772,7 @@
       var v = s.pts * 1 + s.assists * 1.5 + s.steals + s.tackles * 0.6 + s.intercepts;
       if (v > bestV) { bestV = v; best = sim.players[i]; }
     }
-    $('res-mvp').textContent = best ? '★ MVP: ' + best.name + ' ★' : '';
+    $('res-mvp').innerHTML = best ? BBA.Icons.svg('star') + ' MVP: ' + UI.G.esc(best.name) + ' ' + BBA.Icons.svg('star') : '';
     var html = '<table><tr><th></th><th>PTS</th><th>DUNKS</th><th>AST</th><th>STL</th><th>TKL</th><th>INT</th></tr>';
     var order = sim.players.slice().sort(function (a, b) { return a.team - b.team || b.stats.pts - a.stats.pts; });
     for (i = 0; i < order.length; i++) {

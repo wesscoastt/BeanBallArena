@@ -229,14 +229,14 @@
 
   /* ---------------- touch ---------------- */
   var TOUCH_BTNS = [
-    { id: 'jump', label: 'Jump', icon: '⤒', r: 3, b: 3, size: 86 },
-    { id: 'grab', label: 'Grab', icon: '✋', r: 3, b: 25, size: 70 },
-    { id: 'pass', label: 'Pass', icon: '➶', r: 17, b: 16, size: 66 },
-    { id: 'dive', label: 'Dive', icon: '➘', r: 20, b: 2, size: 62 },
-    { id: 'shoot', label: 'Shoot', icon: '◎', r: 14, b: 33, size: 66 },
-    { id: 'ballcam', label: 'Ball', icon: '◉', r: 3, b: 43, size: 50 },
-    { id: 'dunk', label: 'Dunk', icon: '★', r: 27, b: 31, size: 64 },
-    { id: 'ability', label: 'Power', icon: '⚡', r: 3, b: 60, size: 62 }
+    { id: 'jump', label: 'Jump', icon: 'jump', r: 3, b: 3, size: 86 },
+    { id: 'grab', label: 'Grab', icon: 'grab', r: 3, b: 25, size: 70 },
+    { id: 'pass', label: 'Pass', icon: 'pass', r: 17, b: 16, size: 66 },
+    { id: 'dive', label: 'Dive', icon: 'dive', r: 20, b: 2, size: 62 },
+    { id: 'shoot', label: 'Shoot', icon: 'shoot', r: 14, b: 33, size: 66 },
+    { id: 'ballcam', label: 'Ball', icon: 'ballcam', r: 3, b: 43, size: 50 },
+    { id: 'dunk', label: 'Dunk', icon: 'dunk', r: 27, b: 31, size: 64 },
+    { id: 'ability', label: 'Power', icon: 'ability', r: 3, b: 60, size: 62 }
   ];
   C.TOUCH_BTNS = TOUCH_BTNS;
 
@@ -257,7 +257,7 @@
       var el = doc.createElement('div');
       el.className = 'tbtn tbtn-' + d.id;
       el.setAttribute('data-act', d.id);
-      el.innerHTML = '<span class="ti">' + d.icon + '</span><span class="tl">' + d.label + '</span>';
+      el.innerHTML = '<span class="ti">' + BBA.Icons.svg(d.icon) + '</span><span class="tl">' + d.label + '</span>';
       ui.appendChild(el);
       C.touchBtnEls[d.id] = el;
     }
