@@ -514,6 +514,17 @@
     var inp = BBA.Sim.emptyInput();
     var yaw = G.rig.yaw;
     inp.look = yaw;
+    // aim THROUGH the crosshair: from the bean toward the point the camera is looking at
+    // (at the hoop's distance), not parallel to the camera. With the camera off to one side
+    // a parallel aim would always land that far off to the other side.
+    var lp0 = G.sim && G.localId >= 0 ? G.sim.players[G.localId] : null;
+    if (lp0 && G.camera) {
+      var cfx = Math.sin(yaw), cfz = Math.cos(yaw), cp = G.camera.position;
+      var hp = G.sim.attackHoop(lp0.team), D = clamp(hyp(hp.x - lp0.x, hp.z - lp0.z), 6, 30);
+      var along = (lp0.x - cp.x) * cfx + (lp0.z - cp.z) * cfz + D;
+      var px = cp.x + cfx * along, pz = cp.z + cfz * along;
+      if (isFinite(px) && isFinite(pz)) inp.look = Math.atan2(px - lp0.x, pz - lp0.z);
+    }
     if (!ctl || G.paused) return inp;
     var fx = Math.sin(yaw), fz = Math.cos(yaw), rx = -fz, rz = fx;
     inp.mx = fx * ctl.my + rx * ctl.mx;
@@ -1031,7 +1042,7 @@
         }
         G.rig.update(dt, {
           x: lv.pos.x, y: lv.pos.y, z: lv.pos.z, vx: lp.vx, vz: lp.vz, speed: hyp(lp.vx, lp.vz),
-          sprinting: lp.sprinting, aiming: aiming, hasBall: b.holder === lp.id, airborne: !lp.grounded,
+          sprinting: lp.sprinting, aiming: aiming, shooting: lp.charging, hasBall: b.holder === lp.id, airborne: !lp.grounded,
           aimYaw: aimYaw, aimK: aimK
         }, G.paused ? null : ctl, ballVis);
       }

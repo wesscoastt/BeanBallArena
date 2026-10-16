@@ -1737,12 +1737,14 @@
       var dx = b.x - p.x, dy = b.y - sy, dz = b.z - p.z;
       var d = Math.sqrt(dx * dx + dy * dy + dz * dz);
       var ignored = (b.ignoreId === p.id && b.ignoreT > 0);
-      // a defender diving into a fresh shot swats it away (shot block)
+      // a defender diving or jumping into a fresh shot swats it away (shot block, up to rim height)
       var lt = b.lastThrow;
       if (!this.predictOnly && b.state === 'free' && b.inFlight && lt && lt.kind === 'shot' && lt.team !== p.team &&
-          this.time - lt.t < 0.8 && (p.state === 'dive' || p.state === 'slide') && d < R + P.radius + 0.55) {
-        var fl = Math.sqrt(p.vx * p.vx + p.vz * p.vz) || 1;
-        b.vx = p.vx / fl * 6 + (b.vx * 0.15); b.vz = p.vz / fl * 6 + (b.vz * 0.15); b.vy = Math.max(3, b.vy * 0.2);
+          this.time - lt.t < 0.8 && (p.state === 'dive' || p.state === 'slide' || (!p.grounded && p.state !== 'stun')) && d < R + P.radius + 0.55) {   // dive OR jump into it
+        var fl = Math.sqrt(p.vx * p.vx + p.vz * p.vz);
+        if (fl > 3) { b.vx = p.vx / fl * 6 + (b.vx * 0.15); b.vz = p.vz / fl * 6 + (b.vz * 0.15); }
+        else { b.vx = -b.vx * 0.45 + p.vx * 0.5; b.vz = -b.vz * 0.45 + p.vz * 0.5; }   // standing jump: swat it back
+        b.vy = Math.max(3, b.vy * 0.2);
         b.lastThrow = null; b.inFlight = false; b.lastTouchTeam = p.team;
         b.ignoreId = p.id; b.ignoreT = 0.25;
         this.emit({ t: 'block', id: p.id, target: lt.by, kind: 'shot' });

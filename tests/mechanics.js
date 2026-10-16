@@ -21,15 +21,15 @@ console.log('movement');
   var p = s.players[0]; place(p, 0, -5);
   var maxY = 0;
   run(s, 60, function (i) { if (p.y > maxY) maxY = p.y; return { 0: inp({ jump: i < 2 }) }; });
-  ok(Math.abs(maxY - 2.4) < 0.15, 'jump apex ~2.4m', maxY.toFixed(2));
+  ok(Math.abs(maxY - 3.3) < 0.2, 'jump apex ~3.3m (up near the rim)', maxY.toFixed(2));
   // sprint speed
   place(p, -8, -20);
   run(s, 90, function () { return { 0: inp({ mz: 1, sprint: true }) }; });
   ok(p.vz > 9.5, 'sprint speed', p.vz.toFixed(2));
-  // can't jump onto platform from ground
+  // Crown Jam-style jump: you can hop up onto a platform from the ground
   place(p, 10.2, 12.5, Math.PI / 2);
   run(s, 60, function (i) { return { 0: inp({ mx: 1, jump: i === 5 || i === 30 }) }; });
-  ok(p.x < 11 && p.y < 0.5, 'platform wall blocks jump-up', 'x=' + p.x.toFixed(2) + ' y=' + p.y.toFixed(2));
+  ok(p.x > 11.5, 'big jump reaches the platform', 'x=' + p.x.toFixed(2) + ' y=' + p.y.toFixed(2));
   // walk up ramp onto platform
   place(p, 15, 2, 0);
   run(s, 150, function () { return { 0: inp({ mz: 1 }) }; });

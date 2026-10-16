@@ -752,7 +752,7 @@
       var tdh = hyp(threat.x - own.x, threat.z - own.z);
       if (tdh < 7.5) { tx = threat.x + threat.vx * 0.2; tz = threat.z + threat.vz * 0.2; }
       var ease = this._ease(br, p, threat.id);
-      if (!threat.grounded && d < 3 && p.grounded && rng() < br.diff.block * ease) this._pulse(br, 'jump');
+      if ((!threat.grounded || threat.charging) && d < 3.2 && p.grounded && rng() < br.diff.block * ease) this._pulse(br, 'jump');   // contest dunks and shots
       if (tdh < 9 && d > 1.8 && d < 4.5 && p.diveCd <= 0 && threat.stunImmune <= 0 && rng() < 0.2 * br.diff.aggression * br.pers.tackle * ease) {
         var ax = threat.x - p.x, az = threat.z - p.z, al = hyp(ax, az) || 1;
         br.input.mx = ax / al; br.input.mz = az / al; br.path = null;

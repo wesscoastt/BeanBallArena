@@ -27,7 +27,7 @@
       turnWalk: 15,
       turnSprint: 6.5,
       turnAim: 20,
-      jumpVel: 12.0,       // ~9% higher apex than 11.5 (platforms still need the ramps)
+      jumpVel: 14.0,       // Crown Jam-style big jump: up near the rim (feet ~3.3 m), can hop onto platforms
       gravity: 30,
       stepUp: 0.45,
       coyote: 0.1,

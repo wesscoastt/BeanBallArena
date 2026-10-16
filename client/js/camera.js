@@ -95,7 +95,8 @@
     // distance / fov
     var wantDist = 7.3 + Math.min(1.6, f.speed * 0.1) + (f.sprinting ? 0.8 : 0) + (f.hasBall ? 0.3 : 0);
     var wantShoulder = 0, wantFov = 64 + (f.sprinting ? 7 : 0) + Math.min(4, f.speed * 0.3);
-    if (f.aiming) { wantDist = 5.2; wantShoulder = 0.9; wantFov = 58; }
+    // shooting: stay directly behind the bean (an over-the-shoulder offset made shots land left of the crosshair)
+    if (f.aiming) { wantDist = 5.2; wantShoulder = f.shooting ? 0 : 0.9; wantFov = 58; }
     if (f.airborne) wantDist += 0.6;
     this.dist += (wantDist - this.dist) * damp(4, dt);
     this.shoulder += (wantShoulder - this.shoulder) * damp(8, dt);
