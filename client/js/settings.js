@@ -9,7 +9,7 @@
   var isMobile = /iPhone|iPad|iPod|Android/i.test((root.navigator && root.navigator.userAgent) || '');
 
   var DEFAULTS = {
-    name: 'Wesley',
+    name: 'Bean',
     // graphics
     renderScale: isMobile ? 0.8 : 1,
     shadows: !isMobile,
@@ -69,6 +69,8 @@
         var raw = root.localStorage && root.localStorage.getItem(KEY);
         var saved = raw ? JSON.parse(raw) : null;
         if (raw) this.data = deepMerge(DEFAULTS, saved);
+        // the old default name was 'Wesley': saved copies of it become the new default
+        if (this.data.name === 'Wesley') this.data.name = 'Bean';
         // dunk button added: it takes Y/Triangle, so an older save with ball cam on that button moves it to RS click
         if (saved && saved.pad && saved.pad.dunk === undefined && this.data.pad.ballcam === 3) this.data.pad.ballcam = 11;
         // v0.5: the old on/off "full arc" toggle became the shotArc choice (full is now the default)
