@@ -71,6 +71,7 @@
     var S = BBA.Settings.data;
     $('pc-name').textContent = S.name;
     $('pc-avatar').style.background = S.cosmetics.color;
+    if (UI.refreshLevel) UI.refreshLevel();
   };
 
   UI.onDevice = function (d) {
@@ -126,13 +127,20 @@
     UI.current = name;
     if (name === 'main') UI.stack = [];
     if (name === 'setup') UI.buildSetup();
+    if (name === 'ranked' && UI.buildRanked) UI.buildRanked();
+    if (name === 'career' && UI.buildCareer) UI.buildCareer();
+    if (name === 'main' && UI.refreshLevel) UI.refreshLevel();
     if (name === 'settings') UI.buildSettings();
     if (name === 'customize') UI.buildCustomize();
     if (name === 'help') UI.buildHelp();
     if (name === 'main') UI.refreshCard();
     if (name === 'lobby') BBA.Lobby.render();
     if (name === 'pause') { var rs = $('pause-restart'); if (rs) rs.style.display = UI.G.mode === 'online' ? 'none' : ''; }
-    if (name === 'results') { var online = UI.G.mode === 'online'; $('res-again').textContent = online ? 'BACK TO LOBBY' : 'PLAY AGAIN'; $('res-quit').textContent = online ? 'LEAVE ROOM' : 'MAIN MENU'; }
+    if (name === 'results') {
+      var online = UI.G.mode === 'online', rk = UI.G.setup && UI.G.setup.context ? UI.G.setup.context.kind : '';
+      $('res-again').textContent = online ? 'BACK TO LOBBY' : (rk === 'season' ? 'CONTINUE SEASON' : (rk === 'ranked' ? 'NEXT RANKED GAME' : 'PLAY AGAIN'));
+      $('res-quit').textContent = online ? 'LEAVE ROOM' : 'MAIN MENU';
+    }
     UI.focusIdx = 0;
     UI._focus(false);
   };
@@ -173,10 +181,16 @@
       case 'quit': UI.hideMenus(); if (G.mode === 'online') BBA.Lobby.leave(); else G.quitToMenu(); break;
       case 'again':
         if (G.mode === 'online') { G.backToLobby(); break; }
+        var kind = G.setup && G.setup.context ? G.setup.context.kind : '';
+        if (kind === 'season') { UI.careerAction('career-continue'); break; }
+        if (kind === 'ranked') { UI.hideMenus(); G.startMatch(BBA.Career.rankedSetup()); break; }
         UI.hideMenus(); G.startMatch(G.setup); break;
       case 'randomize': UI.randomizeCosmetics(); break;
       case 'restore': UI.restoreDefaults(); break;
-      default: if (a.indexOf('lobby-') === 0) BBA.Lobby.action(a); break;
+      default:
+        if (a.indexOf('lobby-') === 0) BBA.Lobby.action(a);
+        else if ((a.indexOf('career') === 0 || a.indexOf('ranked') === 0) && UI.careerAction) UI.careerAction(a);
+        break;
     }
   };
 
@@ -328,8 +342,20 @@
     $('cust-jersey').value = cos.jerseyName || '';
     box.innerHTML = '';
     function upd() { BBA.Settings.save(); G.refreshPreview(); UI.refreshCard(); }
+    // unlockable categories: only unlocked items (plus whatever you're wearing) are offered,
+    // and the row says what unlocks next
+    var KIND = { hat: 'hats', face: 'faces', pattern: 'patterns', jerseyStyle: 'jerseyStyles', upper: 'uppers', lower: 'lowers', celebration: 'celebrations', victory: 'victories' };
     function ch(label, key, list, extra) {
-      var r = UI.choice(label, list, function () { return cos[key]; }, function (v) { cos[key] = v; upd(); if (extra) extra(); });
+      var kind = KIND[key], K = BBA.Career, desc = '';
+      if (kind && K) {
+        var locked = list.filter(function (it) { return !K.isUnlocked(kind, it[0]); });
+        list = list.filter(function (it) { return K.isUnlocked(kind, it[0]) || it[0] === cos[key]; });
+        if (locked.length) {
+          var nx = locked.map(function (it) { return [K.unlockLevel(kind, it[0]), it[1]]; }).sort(function (a, b) { return a[0] - b[0]; })[0];
+          desc = locked.length + ' locked · next: ' + nx[1] + ' at level ' + nx[0];
+        }
+      }
+      var r = UI.choice(label, list, function () { return cos[key]; }, function (v) { cos[key] = v; upd(); if (extra) extra(); }, desc);
       box.appendChild(r);
     }
     box.appendChild(UI.swatches('BODY COLOR', COS.colors, function () { return cos.color; }, function (v) { cos.color = v; upd(); }));
@@ -351,7 +377,10 @@
     G.refreshPreview();
   };
   UI.randomizeCosmetics = function () {
-    var COS = BBA.Character.COS, cos = BBA.Settings.data.cosmetics;
+    var COS0 = BBA.Character.COS, cos = BBA.Settings.data.cosmetics, K = BBA.Career, COS = {}, k;
+    // randomize only from what you've unlocked
+    var KIND = { hats: 1, faces: 1, patterns: 1, jerseyStyles: 1, uppers: 1, lowers: 1, celebrations: 1, victories: 1 };
+    for (k in COS0) COS[k] = (KIND[k] && K) ? COS0[k].filter(function (it) { return K.isUnlocked(k, it[0]); }) : COS0[k];
     function pk(a) { return a[Math.floor(Math.random() * a.length)]; }
     cos.color = pk(COS.colors); cos.color2 = pk(COS.colors); cos.pattern = pk(COS.patterns)[0]; cos.face = pk(COS.faces)[0];
     cos.hat = pk(COS.hats)[0]; cos.upper = pk(COS.uppers)[0]; cos.lower = pk(COS.lowers)[0];
@@ -761,7 +790,8 @@
   UI.showResults = function (sim, localId, teamCss, podium) {
     $('scr-results').classList.toggle('podium', !!podium);
     var m = sim.match, lp = sim.players[localId];
-    var title = m.winner < 0 ? 'DRAW!' : (C.TEAM_NAMES[m.winner] + ' WINS!');
+    var tn = UI.G.teamNames || C.TEAM_NAMES;
+    var title = m.winner < 0 ? 'DRAW!' : (tn[m.winner] + ' WIN' + (UI.G.teamNames ? '' : 'S') + '!');
     var won = m.winner === lp.team;
     $('res-title').textContent = won ? 'VICTORY! ' + title : title;
     $('res-title').style.color = m.winner < 0 ? '#fff' : teamCss[m.winner];
@@ -781,7 +811,19 @@
     }
     html += '</table>';
     $('res-table').innerHTML = html;
+    // XP / levels / unlocks / ranked points (once per match)
+    var rew = null;
+    if (BBA.Career && !sim._rewarded) { sim._rewarded = true; rew = BBA.Career.onMatchEnd(UI.G.setup && UI.G.mode !== 'online' ? UI.G.setup : null, sim, localId); sim._reward = rew; }
+    else rew = sim._reward;
+    $('res-reward').innerHTML = rew ? rew.lines.map(function (l) { return '<span>' + UI.G.esc(l) + '</span>'; }).join('') : '';
     UI.show('results');
+  };
+
+  /* scoreboard team names (career / ranked use real team names) */
+  UI.setTeamNames = function (names) {
+    var els = doc.querySelectorAll('.sb-name');
+    if (els[0]) els[0].textContent = names ? names[0] : C.TEAM_NAMES[0];
+    if (els[1]) els[1].textContent = names ? names[1] : C.TEAM_NAMES[1];
   };
 
   BBA.UI = UI;

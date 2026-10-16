@@ -51,6 +51,8 @@
       <div class="logo"><div class="logo-crown" data-icon="crown"></div><div class="logo-top"><span class="l-bean">BEAN</span> <span class="l-ball">BALL</span></div><div class="logo-bot">ARENA</div></div>
       <nav class="main-nav">
         <button class="mbtn mbtn-play" data-act="quick"><span class="ico" data-icon="play"></span>PLAY</button>
+        <button class="mbtn mbtn-new" data-act="career"><span class="ico" data-icon="trophy"></span>CAREER</button>
+        <button class="mbtn mbtn-new" data-act="ranked"><span class="ico" data-icon="medal"></span>RANKED</button>
         <button class="mbtn" data-act="setup"><span class="ico" data-icon="bot"></span>PLAY VS BOTS</button>
         <button class="mbtn" data-act="create"><span class="ico" data-icon="friends"></span>CREATE PRIVATE MATCH</button>
         <button class="mbtn" data-act="join"><span class="ico" data-icon="join"></span>JOIN PRIVATE MATCH</button>
@@ -59,7 +61,7 @@
       </nav>
     </div>
     <div class="main-right">
-      <div class="pcard"><div class="pc-avatar" id="pc-avatar"></div><div class="pc-info"><div class="pc-name" id="pc-name">Bean</div><div class="pc-sub">Ready to play</div></div></div>
+      <div class="pcard"><div class="pc-avatar" id="pc-avatar"></div><div class="pc-info"><div class="pc-name" id="pc-name">Bean</div><div class="pc-sub" id="pc-sub">Ready to play</div><div class="pc-xp"><div class="pc-xpfill" id="pc-xpfill"></div></div></div></div>
       <div class="welcome">
         <div class="w-title">WELCOME TO BEAN BALL ARENA!</div>
         <div class="w-body">3v3 party hoops. Drop from your team deck, grab the ball, pass, dunk, and don't get tackled.</div>
@@ -194,11 +196,34 @@
       <h2 id="res-title">BLUE WINS!</h2>
       <div class="res-score" id="res-score"></div>
       <div class="res-mvp" id="res-mvp"></div>
+      <div class="res-reward" id="res-reward"></div>
       <div class="res-table" id="res-table"></div>
       <div class="panel-actions">
         <button class="pbtn back" data-act="quit" id="res-quit">MAIN MENU</button>
         <button class="pbtn go" data-act="again" id="res-again">PLAY AGAIN</button>
       </div>
+    </div>
+  </section>
+
+  <!-- RANKED -->
+  <section class="screen panel-screen" id="scr-ranked">
+    <div class="panel wide">
+      <h2>RANKED</h2>
+      <div class="rk-body" id="rk-body"></div>
+      <div class="panel-actions">
+        <button class="pbtn back" data-act="back">BACK</button>
+        <button class="pbtn go" data-act="ranked-play">PLAY RANKED</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- CAREER -->
+  <section class="screen panel-screen" id="scr-career">
+    <div class="panel wide career">
+      <h2 id="cr-title">CAREER</h2>
+      <div class="tabs" id="cr-tabs"></div>
+      <div class="cr-body" id="cr-body"></div>
+      <div class="panel-actions wrap" id="cr-actions"></div>
     </div>
   </section>
 
@@ -242,6 +267,8 @@
 <script src="js/ui.js"></script>
 <script src="js/network.js"></script>
 <script src="js/lobby.js"></script>
+<script src="js/career.js"></script>
+<script src="js/careerui.js"></script>
 <script src="js/game.js"></script>
 <script>
   (function () {

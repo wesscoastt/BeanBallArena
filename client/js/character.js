@@ -8,9 +8,9 @@
 
   var COS = {
     colors: ['#ffd23f', '#ff7a2f', '#ff4f8b', '#b86bff', '#5b8cff', '#2fd3c4', '#6fdc4a', '#f2f2f2', '#3a3a4a', '#ff9ec8', '#8be0ff', '#c58a52'],
-    patterns: [['solid', 'Solid'], ['stripes', 'Stripes'], ['dots', 'Polka Dots'], ['split', 'Two-Tone'], ['spots', 'Spotty'], ['zigzag', 'Zig-Zag'], ['stars', 'Stars']],
-    faces: [['classic', 'Classic'], ['happy', 'Happy'], ['fierce', 'Fierce'], ['sleepy', 'Sleepy'], ['shades', 'Shades'], ['visor', 'Robo Visor'], ['derp', 'Derp']],
-    hats: [['none', 'None'], ['cap', 'Ball Cap'], ['beanie', 'Pom Beanie'], ['crown', 'Gold Crown'], ['horns', 'Horned Helm'], ['propeller', 'Propeller'], ['cone', 'Traffic Cone'], ['tophat', 'Top Hat'], ['headphones', 'Headphones'], ['antenna', 'Antenna'], ['chef', 'Chef Hat'], ['spikes', 'Dino Spikes']],
+    patterns: [['solid', 'Solid'], ['stripes', 'Stripes'], ['dots', 'Polka Dots'], ['split', 'Two-Tone'], ['spots', 'Spotty'], ['zigzag', 'Zig-Zag'], ['stars', 'Stars'], ['checker', 'Checkers'], ['camo', 'Camo']],
+    faces: [['classic', 'Classic'], ['happy', 'Happy'], ['fierce', 'Fierce'], ['sleepy', 'Sleepy'], ['shades', 'Shades'], ['visor', 'Robo Visor'], ['derp', 'Derp'], ['wink', 'Wink'], ['stareyes', 'Star Eyes']],
+    hats: [['none', 'None'], ['cap', 'Ball Cap'], ['beanie', 'Pom Beanie'], ['crown', 'Gold Crown'], ['horns', 'Horned Helm'], ['propeller', 'Propeller'], ['cone', 'Traffic Cone'], ['tophat', 'Top Hat'], ['headphones', 'Headphones'], ['antenna', 'Antenna'], ['chef', 'Chef Hat'], ['spikes', 'Dino Spikes'], ['halo', 'Halo'], ['wizard', 'Wizard Hat'], ['pirate', 'Pirate Hat'], ['flower', 'Flower Crown'], ['bunny', 'Bunny Ears']],
     uppers: [['jersey', 'Team Jersey'], ['hoodie', 'Team Hoodie'], ['scarf', 'Jersey + Scarf'], ['bowtie', 'Jersey + Bow Tie'], ['cape', 'Jersey + Cape'], ['none', 'Sash Only']],
     lowers: [['shorts', 'Shorts'], ['none', 'None'], ['tutu', 'Tutu'], ['boots', 'Team Boots'], ['socks', 'Striped Socks']],
     celebrations: [['hop', 'Happy Hop'], ['spin', 'Spin'], ['flex', 'Flex'], ['wave', 'Wave']],
@@ -40,6 +40,16 @@
     else if (pattern === 'spots') { var r = 1234; for (i = 0; i < 22; i++) { r = (r * 9301 + 49297) % 233280; var x = r / 233280 * 256; r = (r * 9301 + 49297) % 233280; var y = r / 233280 * 256; g.beginPath(); g.ellipse(x, y, 14 + (i % 3) * 5, 10 + (i % 2) * 4, i, 0, 7); g.fill(); } }
     else if (pattern === 'zigzag') { g.lineWidth = 12; g.strokeStyle = c2; for (j = 30; j < 256; j += 70) { g.beginPath(); for (i = 0; i <= 256; i += 32) g.lineTo(i, j + ((i / 32) % 2 ? 18 : -18)); g.stroke(); } }
     else if (pattern === 'stars') { for (i = 0; i < 5; i++) for (j = 0; j < 5; j++) star(g, i * 52 + (j % 2) * 26 + 13, j * 52 + 26, 11, 5); }
+    else if (pattern === 'checker') { for (i = 0; i < 8; i++) for (j = 0; j < 8; j++) if ((i + j) % 2) g.fillRect(i * 32, j * 32, 32, 32); }
+    else if (pattern === 'camo') {
+      var rc = 4321;
+      for (i = 0; i < 26; i++) {
+        rc = (rc * 9301 + 49297) % 233280; var cx = rc / 233280 * 256; rc = (rc * 9301 + 49297) % 233280; var cy = rc / 233280 * 256;
+        g.globalAlpha = i % 2 ? 0.55 : 1;
+        g.beginPath(); g.ellipse(cx, cy, 22 + (i % 4) * 7, 12 + (i % 3) * 6, i * 0.7, 0, 7); g.fill();
+      }
+      g.globalAlpha = 1;
+    }
     var t = new THREE.CanvasTexture(cv);
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
     return t;
@@ -394,6 +404,20 @@
       var br = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.025, 0.02), sm); br.position.set(0, 1.335, 0.585); g.add(br);
     } else if (face === 'derp') {
       eye(0.12, 1.25, 1.2); eye(-0.1, 0.7, 0.8);
+    } else if (face === 'wink') {
+      eye(-0.11, 1);
+      var wk = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.018, 6, 12, Math.PI), black);
+      wk.position.set(0.11, 1.28, 0.58); g.add(wk);
+      var sm2 = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.015, 6, 12, Math.PI), black);
+      sm2.rotation.z = Math.PI; sm2.position.set(0, 1.19, 0.58); g.add(sm2);
+    } else if (face === 'stareyes') {
+      var gold = mat('#ffc933', { emissive: '#7a5200', emissiveIntensity: 0.5 });
+      for (var se = -1; se <= 1; se += 2) {
+        var st = new THREE.Mesh(new THREE.CircleGeometry(0.075, 5), gold);
+        st.position.set(0.11 * se, 1.3, 0.585); st.rotation.z = Math.PI / 2; g.add(st);
+      }
+      var om = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.015, 6, 12, Math.PI), black);
+      om.rotation.z = Math.PI; om.position.set(0, 1.19, 0.58); g.add(om);
     } else {
       eye(0.11, 1); eye(-0.11, 1);
     }
@@ -490,6 +514,45 @@
         var puff = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), w); puff.position.set(Math.cos(ang) * fr * 0.55, fY + 0.4, Math.sin(ang) * fr * 0.55); g.add(puff);
       }
       var puffT = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8), w); puffT.position.y = fY + 0.5; g.add(puffT);
+    } else if (hat === 'halo') {
+      var haloM = new THREE.MeshBasicMaterial({ color: '#ffe680' });
+      var halo = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.045, 8, 28), haloM);
+      halo.rotation.x = Math.PI / 2; halo.position.y = TOP + 0.2; g.add(halo);
+    } else if (hat === 'wizard') {
+      var wzY = 1.5, wzR = bodyR(wzY) + 0.05, wzM = mat('#5b3cc0');
+      var wb2 = new THREE.Mesh(new THREE.CylinderGeometry(wzR + 0.22, wzR + 0.22, 0.04, 22), wzM); wb2.position.y = wzY; g.add(wb2);
+      h = new THREE.Mesh(new THREE.ConeGeometry(wzR, 0.95, 18), wzM); h.position.y = wzY + 0.47; h.rotation.z = 0.12; g.add(h);
+      for (var ws = 0; ws < 3; ws++) {
+        var wst = new THREE.Mesh(new THREE.OctahedronGeometry(0.05, 0), mat('#ffd23f', { emissive: '#7a5200', emissiveIntensity: 0.5 }));
+        wst.position.set(Math.sin(ws * 2.1) * (wzR - 0.08 - ws * 0.05), wzY + 0.2 + ws * 0.2, Math.cos(ws * 2.1) * (wzR - 0.08 - ws * 0.05)); g.add(wst);
+      }
+    } else if (hat === 'pirate') {
+      var pY = 1.52, pR = bodyR(pY) + 0.04, pM = mat('#1a1a22');
+      h = headShell(pY, 0.04, pM); g.add(h);
+      for (var pc = 0; pc < 3; pc++) {
+        var flap = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.26, 0.05), pM);
+        var pa = pc / 3 * Math.PI * 2 + Math.PI;
+        flap.position.set(Math.sin(pa) * pR, pY + 0.12, Math.cos(pa) * pR); flap.rotation.y = pa; flap.rotation.x = -0.25; g.add(flap);
+      }
+      var skull = new THREE.Mesh(new THREE.CircleGeometry(0.07, 12), mat('#ffffff')); skull.position.set(0, pY + 0.14, pR + 0.04); g.add(skull);
+    } else if (hat === 'flower') {
+      var flY = 1.5, flR = bodyR(flY) + 0.04;
+      var vine = new THREE.Mesh(new THREE.TorusGeometry(flR, 0.035, 6, 22), mat('#3f9e4a')); vine.rotation.x = Math.PI / 2; vine.position.y = flY; g.add(vine);
+      var petals = ['#ff6fa8', '#ffd23f', '#ffffff', '#b86bff', '#ff9a3a'];
+      for (var fl = 0; fl < 7; fl++) {
+        var fa = fl / 7 * Math.PI * 2;
+        var bloom = new THREE.Mesh(new THREE.SphereGeometry(0.075, 8, 6), mat(petals[fl % petals.length]));
+        bloom.scale.set(1, 0.6, 1); bloom.position.set(Math.sin(fa) * flR, flY + 0.03, Math.cos(fa) * flR); g.add(bloom);
+      }
+    } else if (hat === 'bunny') {
+      var bnM = mat('#ffffff'), bnIn = mat('#ff9ec8');
+      for (var be = -1; be <= 1; be += 2) {
+        var earY = 1.6, earX = 0.17 * be;
+        var ear = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), bnM); ear.scale.set(0.08, 0.3, 0.05);
+        ear.position.set(earX, earY + 0.28, 0); ear.rotation.z = -0.18 * be; g.add(ear);
+        var inner = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 6), bnIn); inner.scale.set(0.045, 0.22, 0.03);
+        inner.position.set(earX, earY + 0.28, 0.03); inner.rotation.z = -0.18 * be; g.add(inner);
+      }
     } else if (hat === 'spikes') {
       // a ridge of spikes running down the back, each standing out along the surface normal
       for (var k = 0; k < 6; k++) {

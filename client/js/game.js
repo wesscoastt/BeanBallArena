@@ -151,7 +151,10 @@
   }
 
   /* ---------------- match lifecycle ---------------- */
+  G.tname = function (t) { return G.teamNames ? G.teamNames[t] : C.TEAM_NAMES[t]; };
+
   G._clear = function () {
+    G.teamNames = null; if (BBA.UI.setTeamNames) BBA.UI.setTeamNames(null);
     for (var i = 0; i < G.views.length; i++) G.views[i].dispose();
     G.views = [];
     G.sim = null; G.ai = null; G.localId = -1;
@@ -389,18 +392,22 @@
     var maxTeam = BBA.Arenas.get(setup.arena || 'bean_bowl').maxTeam || 3;
     var size = clamp(setup.teamSize || 3, 1, maxTeam);
     var names = botNames(size * 2, r), roster = [], i, ni = 0;
+    // career / ranked games bring their own rosters (season teammates and opponents keep their names)
+    var nm = setup.names || {}, mates = nm.mates || [], opps = nm.opps || [];
     G.cosmetics = [];
     roster.push({ team: 0, name: S.name || 'You', isBot: false });
     G.cosmetics.push(S.cosmetics);
-    for (i = 1; i < size; i++) { roster.push({ team: 0, name: names[ni++], isBot: true }); G.cosmetics.push(randomCosmetics(r)); }
-    for (i = 0; i < size; i++) { roster.push({ team: 1, name: names[ni++], isBot: true }); G.cosmetics.push(randomCosmetics(r)); }
+    for (i = 1; i < size; i++) { roster.push({ team: 0, name: mates[i - 1] || names[ni++], isBot: true }); G.cosmetics.push(randomCosmetics(r)); }
+    for (i = 0; i < size; i++) { roster.push({ team: 1, name: opps[i] || names[ni++], isBot: true }); G.cosmetics.push(randomCosmetics(r)); }
+    G.teamNames = setup.teamNames || null;
+    BBA.UI.setTeamNames(G.teamNames);
     G.sim = new BBA.Sim({
       roster: roster, mode: 'match', seed: (r() * 1e9) | 0, countdown: 3.5, warmup: wu,
       settings: { duration: setup.duration || 240, difficulty: setup.difficulty || 'normal', modifier: setup.modifier || 'none', teamSize: size, arena: setup.arena || 'bean_bowl',
         mercyLead: setup.mercyLead === undefined ? 12 : setup.mercyLead, kickoffReset: setup.kickoffReset !== false, abilities: setup.abilities !== false }
     });
     G.ai = new BBA.AI(G.sim);
-    for (i = 1; i < roster.length; i++) G.ai.addBot(i, setup.difficulty || 'normal');
+    for (i = 1; i < roster.length; i++) G.ai.addBot(i, roster[i].team === 0 ? (setup.mateDifficulty || setup.difficulty || 'normal') : (setup.difficulty || 'normal'));
     G.localId = 0;
     G._createViews();
     var lp = G.sim.players[0];
@@ -934,14 +941,14 @@
             G.fx.burst('confetti', hs.x, hs.y, hs.z, { n: 50, colors: [G.teamCss[e.team], '#ffffff', '#ffd23f'] });
             if (!menu) { BBA.Audio.play('swish'); BBA.Audio.play('score'); }
             var who = e.scorer >= 0 ? esc(G._pname(e.scorer)) : (e.kind === 'own' ? 'Own goal!' : '');
-            var title = e.kind === 'long' ? 'LONG SHOT! +3' : (C.TEAM_NAMES[e.team] + ' SCORES! +' + e.pts);
+            var title = e.kind === 'long' ? 'LONG SHOT! +3' : (G.tname(e.team) + ' SCORES! +' + e.pts);
             if (!menu) UI.banner(title, who, 'score ' + (e.team === 0 ? 'blue' : 'red'));
           } else if (!menu) BBA.Audio.play('score');
           G.arena.hype(1);
           G.arena.cheer(e.team, e.kind === 'dunk' ? 1.5 : (e.kind === 'long' ? 1.3 : 1));
           if (!menu) {
             UI.scoreFlash(e.team);
-            var line = '<b style="color:' + G.teamCss[e.team] + '">' + (e.scorer >= 0 ? esc(G._pname(e.scorer)) : C.TEAM_NAMES[e.team]) + '</b> +' + e.pts +
+            var line = '<b style="color:' + G.teamCss[e.team] + '">' + (e.scorer >= 0 ? esc(G._pname(e.scorer)) : G.tname(e.team)) + '</b> +' + e.pts +
               (e.kind === 'dunk' ? ' (dunk)' : (e.kind === 'long' ? ' (long range)' : '')) + (e.assist >= 0 ? ' · assist ' + esc(G._pname(e.assist)) : '');
             UI.feed(line);
           }
@@ -961,7 +968,7 @@
           if (!menu) {
             var won = e.winner === localTeam;
             if (e.winner >= 0) G.arena.cheer(e.winner, 2);
-            UI.banner(e.winner < 0 ? 'DRAW!' : (C.TEAM_NAMES[e.winner] + ' WINS!'), (e.reason === 'mercy' ? 'MERCY RULE · ' : '') + e.score[0] + ' - ' + e.score[1], e.winner === 0 ? 'score blue' : 'score red');
+            UI.banner(e.winner < 0 ? 'DRAW!' : (G.tname(e.winner) + ' WINS!'), (e.reason === 'mercy' ? 'MERCY RULE · ' : '') + e.score[0] + ' - ' + e.score[1], e.winner === 0 ? 'score blue' : 'score red');
             BBA.Audio.play(won ? 'victory' : 'defeat');
             BBA.Audio.setMusic('menu');
             G.endT = 0;
